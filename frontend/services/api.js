@@ -32,18 +32,26 @@ const handleResponse = async (response) => {
 
 // Auth API endpoints
 export const authAPI = {
-  // Login
-  login: async (credentials) => {
-    const response = await fetch(`${API_BASE_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-    
-    return handleResponse(response);
-  },
+
+activateUser: (id) => axios.patch(`${API_URL}/users/${id}/activate`),
+deactivateUser: (id) => axios.patch(`${API_URL}/users/${id}/deactivate`),
+
+// FIXED - use fetch like the rest of the file
+activateUser: async (id) => {
+  const response = await fetch(`${API_BASE_URL}/users/${id}/activate`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+},
+
+deactivateUser: async (id) => {
+  const response = await fetch(`${API_BASE_URL}/users/${id}/deactivate`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+},
 
   // Register new user (Create user account - Manager only)
   register: async (userData) => {
@@ -158,6 +166,7 @@ export const authAPI = {
     
     return handleResponse(response);
   },
+  
 };
 
 export default authAPI;

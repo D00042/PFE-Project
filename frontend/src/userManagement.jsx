@@ -1,26 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import Logo from './components/Logo';
+
 function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); 
+  const [modalMode, setModalMode] = useState('create');
   const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
-    role: 'Team Member'
+    role: 'Team Member',
+    isActive: true
   });
-  const navigate = useNavigate();
+useEffect(() => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  if (!user || user.role !== 'Team Leader') {
+    navigate('/dashboard'); // navigate not declared yet!
+  }
+  fetchUsers();
+}, []);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+const navigate = useNavigate(); // move to top, before any useEffect
+
+useEffect(() => {
+  const storedUser = localStorage.getItem('user');
+  if (!storedUser) {
+    navigate('/login');
+    return;
+  }
+  const user = JSON.parse(storedUser);
+  if (user.role !== 'Team Leader') {
+    alert("Access Denied: Only Team Leaders can manage accounts.");
+    navigate('/dashboard');
+    return;
+  }
+  fetchUsers();
+}, [navigate]); // Add navigate to dependency array
+ 
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -36,9 +58,10 @@ function UserManagement() {
   };
 
   const handleChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     });
   };
 
@@ -48,7 +71,8 @@ function UserManagement() {
       fullName: '',
       email: '',
       password: '',
-      role: 'Team Member'
+      role: 'Team Member',
+      isActive: true
     });
     setShowModal(true);
     setError('');
@@ -62,7 +86,8 @@ function UserManagement() {
       fullName: user.fullName,
       email: user.email,
       password: '',
-      role: user.role
+      role: user.role,
+      isActive: user.isActive !== false // Default to true if not specified
     });
     setShowModal(true);
     setError('');
@@ -83,6 +108,8 @@ function UserManagement() {
         const updateData = {
           fullName: formData.fullName,
           email: formData.email,
+          role: formData.role,
+          isActive: formData.isActive,
           ...(formData.password && { password: formData.password })
         };
         await authAPI.updateUser(selectedUser.id, updateData);
@@ -101,8 +128,32 @@ function UserManagement() {
     }
   };
 
+const handleToggleActive = async (userId, currentStatus) => {
+  const action = currentStatus ? 'deactivate' : 'activate'; // If active, we want to deactivate
+  
+  if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
+  
+  setLoading(true);
+  setError('');
+  try {
+    if (currentStatus) {
+      await authAPI.deactivateUser(userId);
+    } else {
+      await authAPI.activateUser(userId);
+    }
+    
+    setMessage(`User ${action}d successfully!`);
+    fetchUsers();
+    setTimeout(() => setMessage(''), 3000);
+  } catch (err) {
+    setError(`Failed to ${action} user`);
+  } finally {
+    setLoading(false);
+  }
+};
+
   const handleDelete = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
     
     setLoading(true);
     setError('');
@@ -134,9 +185,9 @@ function UserManagement() {
               <Logo size="medium" />
               <div>
                 <h1 className="text-2xl font-bold" style={{ color: '#092A5E' }}>
-                  User Management
+                  Account Management
                 </h1>
-                <p className="text-sm text-gray-600">Manage team member accounts</p>
+                <p className="text-sm text-gray-600">Create, edit, activate and deactivate accounts</p>
               </div>
             </div>
             <button
@@ -159,7 +210,7 @@ function UserManagement() {
             className="px-6 py-3 rounded-xl text-white font-bold shadow-lg transition-all hover:shadow-xl"
             style={{ backgroundColor: '#70CBF4' }}
           >
-            + Create New User
+            + Create New Account
           </button>
           <button
             onClick={fetchUsers}
@@ -193,19 +244,20 @@ function UserManagement() {
                   <th className="px-6 py-4 text-left text-sm font-bold text-white">Full Name</th>
                   <th className="px-6 py-4 text-left text-sm font-bold text-white">Email</th>
                   <th className="px-6 py-4 text-left text-sm font-bold text-white">Role</th>
+                  <th className="px-6 py-4 text-left text-sm font-bold text-white">Status</th>
                   <th className="px-6 py-4 text-left text-sm font-bold text-white">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && users.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
                       Loading users...
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
                       No users found
                     </td>
                   </tr>
@@ -216,14 +268,31 @@ function UserManagement() {
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">{user.fullName}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                       <td className="px-6 py-4">
+  <span
+    className="px-3 py-1 rounded-full text-xs font-bold"
+    style={{
+      backgroundColor: 
+        user.role === 'Manager' ? '#092A5E' :       // Dark Blue
+        user.role === 'Team Leader' ? '#70CBF4' :    // TUI Sky Blue
+        '#E5E7EB',                                   // Light Gray
+      color: 
+        user.role === 'Manager' ? 'white' :
+        user.role === 'Team Leader' ? 'white' : 
+        '#374151'                                    // Dark text for light gray
+    }}
+  >
+    {user.role}
+  </span>
+</td>
+                      <td className="px-6 py-4">
                         <span
                           className="px-3 py-1 rounded-full text-xs font-bold"
                           style={{
-                            backgroundColor: user.role === 'Manager' ? '#70CBF4' : '#e5e7eb',
-                            color: user.role === 'Manager' ? 'white' : '#374151'
+                            backgroundColor: user.isActive !== false ? '#10b981' : '#ef4444',
+                            color: 'white'
                           }}
                         >
-                          {user.role}
+                          {user.isActive !== false ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -232,13 +301,26 @@ function UserManagement() {
                             onClick={() => handleEditClick(user)}
                             className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
                             style={{ backgroundColor: '#70CBF4', color: 'white' }}
+                            title="Edit user"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(user.id, user.isActive !== false)}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
+                            style={{ 
+                              backgroundColor: user.isActive !== false ? '#f59e0b' : '#10b981',
+                              color: 'white'
+                            }}
+                            title={user.isActive !== false ? 'Deactivate user' : 'Activate user'}
+                          >
+                            {user.isActive !== false ? 'Deactivate' : 'Activate'}
                           </button>
                           <button
                             onClick={() => handleDelete(user.id)}
                             className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
                             style={{ backgroundColor: '#D40E14', color: 'white' }}
+                            title="Delete user"
                           >
                             Delete
                           </button>
@@ -259,7 +341,7 @@ function UserManagement() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
             <div className="px-8 pt-8 pb-6 text-center" style={{ backgroundColor: '#092A5E' }}>
               <h2 className="text-2xl font-bold text-white">
-                {modalMode === 'create' ? 'Create New User' : 'Edit User'}
+                {modalMode === 'create' ? 'Create New Account' : 'Edit Account'}
               </h2>
             </div>
 
@@ -319,6 +401,7 @@ function UserManagement() {
                     required
                   >
                     <option value="Team Member">Team Member</option>
+                    <option value="Team Leader">Team Leader</option>
                     <option value="Manager">Manager</option>
                   </select>
                 </div>
@@ -336,6 +419,21 @@ function UserManagement() {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-[#70CBF4]"
                     required={modalMode === 'create'}
                   />
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    id="isActive"
+                    checked={formData.isActive}
+                    onChange={handleChange}
+                    className="w-5 h-5 rounded"
+                    style={{ accentColor: '#70CBF4' }}
+                  />
+                  <label htmlFor="isActive" className="text-sm font-semibold cursor-pointer" style={{ color: '#092A5E' }}>
+                    Account Active
+                  </label>
                 </div>
 
                 <div className="flex space-x-3 pt-4">
