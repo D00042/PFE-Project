@@ -170,3 +170,128 @@ deactivateUser: async (id) => {
 };
 
 export default authAPI;
+// ADD THESE TO YOUR EXISTING api.js, inside the authAPI export object
+// (or create a separate dataAPI export below authAPI)
+
+export const dataAPI = {
+
+  // ─── REVENUE & EXPENSES ──────────────────────────────────────────────────
+  createRevenueExpense: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/revenue-expenses`, {
+      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  getAllRevenueExpenses: async () => {
+    const response = await fetch(`${API_BASE_URL}/revenue-expenses`, { headers: getAuthHeaders() });
+    return handleResponse(response);
+  },
+  updateRevenueExpense: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/revenue-expenses/${id}`, {
+      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteRevenueExpense: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/revenue-expenses/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  // ─── ASSETS & LIABILITIES ────────────────────────────────────────────────
+  createAssetLiability: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/asset-liabilities`, {
+      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  getAllAssetLiabilities: async () => {
+    const response = await fetch(`${API_BASE_URL}/asset-liabilities`, { headers: getAuthHeaders() });
+    return handleResponse(response);
+  },
+  updateAssetLiability: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/asset-liabilities/${id}`, {
+      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteAssetLiability: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/asset-liabilities/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  // ─── CASH FLOW ───────────────────────────────────────────────────────────
+  createCashFlow: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/cash-flows`, {
+      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  getAllCashFlows: async () => {
+    const response = await fetch(`${API_BASE_URL}/cash-flows`, { headers: getAuthHeaders() });
+    return handleResponse(response);
+  },
+  updateCashFlow: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/cash-flows/${id}`, {
+      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteCashFlow: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/cash-flows/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  // ─── SUPPLIERS ───────────────────────────────────────────────────────────
+  createSupplier: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/suppliers`, {
+      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  getAllSuppliers: async () => {
+    const response = await fetch(`${API_BASE_URL}/suppliers`, { headers: getAuthHeaders() });
+    return handleResponse(response);
+  },
+  updateSupplier: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteSupplier: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  // ─── CUSTOMERS ───────────────────────────────────────────────────────────
+  createCustomer: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/customers`, {
+      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  getAllCustomers: async () => {
+    const response = await fetch(`${API_BASE_URL}/customers`, { headers: getAuthHeaders() });
+    return handleResponse(response);
+  },
+  updateCustomer: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
+      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteCustomer: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+};

@@ -21,12 +21,12 @@ function UserManagement() {
 useEffect(() => {
   const user = JSON.parse(localStorage.getItem('user'));
   if (!user || user.role !== 'Team Leader') {
-    navigate('/dashboard'); // navigate not declared yet!
+    navigate('/dashboard'); 
   }
   fetchUsers();
 }, []);
 
-const navigate = useNavigate(); // move to top, before any useEffect
+const navigate = useNavigate(); 
 
 useEffect(() => {
   const storedUser = localStorage.getItem('user');
@@ -41,7 +41,7 @@ useEffect(() => {
     return;
   }
   fetchUsers();
-}, [navigate]); // Add navigate to dependency array
+}, [navigate]); 
  
 
   const fetchUsers = async () => {
@@ -87,7 +87,7 @@ useEffect(() => {
       email: user.email,
       password: '',
       role: user.role,
-      isActive: user.isActive !== false // Default to true if not specified
+      isActive: user.isActive !== false 
     });
     setShowModal(true);
     setError('');
@@ -129,7 +129,7 @@ useEffect(() => {
   };
 
 const handleToggleActive = async (userId, currentStatus) => {
-  const action = currentStatus ? 'deactivate' : 'activate'; // If active, we want to deactivate
+  const action = currentStatus ? 'deactivate' : 'activate'; 
   
   if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
   
@@ -272,13 +272,13 @@ const handleToggleActive = async (userId, currentStatus) => {
     className="px-3 py-1 rounded-full text-xs font-bold"
     style={{
       backgroundColor: 
-        user.role === 'Manager' ? '#092A5E' :       // Dark Blue
-        user.role === 'Team Leader' ? '#70CBF4' :    // TUI Sky Blue
-        '#E5E7EB',                                   // Light Gray
+        user.role === 'Manager' ? '#092A5E' :       
+        user.role === 'Team Leader' ? '#70CBF4' :    
+        '#E5E7EB',                                   
       color: 
         user.role === 'Manager' ? 'white' :
         user.role === 'Team Leader' ? 'white' : 
-        '#374151'                                    // Dark text for light gray
+        '#374151'                                    
     }}
   >
     {user.role}

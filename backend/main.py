@@ -39,9 +39,7 @@ def create_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     )
     
     db.add(new_user)
-    db.flush()  # CHANGE: flush instead of commit to get the new_user.id
-    
-    # ADD THIS BLOCK - create linked Account
+    db.flush()  
     new_account = models.Account(
         userId=new_user.id,
         email=user_in.email,
@@ -50,7 +48,7 @@ def create_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     )
     db.add(new_account)
     
-    db.commit()  # now commit both together
+    db.commit() 
     db.refresh(new_user)
     return new_user
 
@@ -164,7 +162,7 @@ def login(credentials: dict, db: Session = Depends(get_db)):
     if not user.isActive:
         raise HTTPException(status_code=403, detail="Account is deactivated")
     
-    # ADD THIS - track last login on the Account
+    
     if user.account:
         from datetime import datetime
         user.account.lastLogin = datetime.utcnow()
@@ -176,3 +174,212 @@ def login(credentials: dict, db: Session = Depends(get_db)):
         "role": user.role,
         "fullName": user.fullName
     }
+
+# REVENUE & EXPENSES 
+
+@app.post("/revenue-expenses", response_model=schemas.RevenueExpenseOut, status_code=201)
+def create_revenue_expense(entry: schemas.RevenueExpenseCreate, db: Session = Depends(get_db)):
+    new_entry = models.RevenueExpense(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@app.get("/revenue-expenses", response_model=list[schemas.RevenueExpenseOut])
+def get_all_revenue_expenses(db: Session = Depends(get_db)):
+    return db.query(models.RevenueExpense).all()
+
+@app.get("/revenue-expenses/{entry_id}", response_model=schemas.RevenueExpenseOut)
+def get_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.RevenueExpense).filter(models.RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@app.put("/revenue-expenses/{entry_id}", response_model=schemas.RevenueExpenseOut)
+def update_revenue_expense(entry_id: int, update: schemas.RevenueExpenseUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.RevenueExpense).filter(models.RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.delete("/revenue-expenses/{entry_id}")
+def delete_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.RevenueExpense).filter(models.RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+
+# ASSETS & LIABILITIES 
+
+@app.post("/asset-liabilities", response_model=schemas.AssetLiabilityOut, status_code=201)
+def create_asset_liability(entry: schemas.AssetLiabilityCreate, db: Session = Depends(get_db)):
+    new_entry = models.AssetLiability(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@app.get("/asset-liabilities", response_model=list[schemas.AssetLiabilityOut])
+def get_all_asset_liabilities(db: Session = Depends(get_db)):
+    return db.query(models.AssetLiability).all()
+
+@app.get("/asset-liabilities/{entry_id}", response_model=schemas.AssetLiabilityOut)
+def get_asset_liability(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.AssetLiability).filter(models.AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@app.put("/asset-liabilities/{entry_id}", response_model=schemas.AssetLiabilityOut)
+def update_asset_liability(entry_id: int, update: schemas.AssetLiabilityUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.AssetLiability).filter(models.AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.delete("/asset-liabilities/{entry_id}")
+def delete_asset_liability(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.AssetLiability).filter(models.AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+
+# CASH FLOW ENDPOINTS 
+
+@app.post("/cash-flows", response_model=schemas.CashFlowOut, status_code=201)
+def create_cash_flow(entry: schemas.CashFlowCreate, db: Session = Depends(get_db)):
+    new_entry = models.CashFlow(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@app.get("/cash-flows", response_model=list[schemas.CashFlowOut])
+def get_all_cash_flows(db: Session = Depends(get_db)):
+    return db.query(models.CashFlow).all()
+
+@app.get("/cash-flows/{entry_id}", response_model=schemas.CashFlowOut)
+def get_cash_flow(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.CashFlow).filter(models.CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@app.put("/cash-flows/{entry_id}", response_model=schemas.CashFlowOut)
+def update_cash_flow(entry_id: int, update: schemas.CashFlowUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.CashFlow).filter(models.CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.delete("/cash-flows/{entry_id}")
+def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.CashFlow).filter(models.CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+
+#  SUPPLIERS ENDPOINTS 
+
+@app.post("/suppliers", response_model=schemas.SupplierOut, status_code=201)
+def create_supplier(entry: schemas.SupplierCreate, db: Session = Depends(get_db)):
+    new_entry = models.Supplier(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@app.get("/suppliers", response_model=list[schemas.SupplierOut])
+def get_all_suppliers(db: Session = Depends(get_db)):
+    return db.query(models.Supplier).all()
+
+@app.get("/suppliers/{entry_id}", response_model=schemas.SupplierOut)
+def get_supplier(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.Supplier).filter(models.Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@app.put("/suppliers/{entry_id}", response_model=schemas.SupplierOut)
+def update_supplier(entry_id: int, update: schemas.SupplierUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.Supplier).filter(models.Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.delete("/suppliers/{entry_id}")
+def delete_supplier(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.Supplier).filter(models.Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+
+#  CUSTOMERS ENDPOINTS 
+
+@app.post("/customers", response_model=schemas.CustomerOut, status_code=201)
+def create_customer(entry: schemas.CustomerCreate, db: Session = Depends(get_db)):
+    new_entry = models.Customer(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@app.get("/customers", response_model=list[schemas.CustomerOut])
+def get_all_customers(db: Session = Depends(get_db)):
+    return db.query(models.Customer).all()
+
+@app.get("/customers/{entry_id}", response_model=schemas.CustomerOut)
+def get_customer(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.Customer).filter(models.Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@app.put("/customers/{entry_id}", response_model=schemas.CustomerOut)
+def update_customer(entry_id: int, update: schemas.CustomerUpdate, db: Session = Depends(get_db)):
+    entry = db.query(models.Customer).filter(models.Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.delete("/customers/{entry_id}")
+def delete_customer(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(models.Customer).filter(models.Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
