@@ -27,3 +27,20 @@ class UserOut(BaseModel):
     
     class Config:
         from_attributes = True
+        
+class AccountOut(BaseModel):
+    id: int
+    userId: int
+    email: str
+    isActive: bool
+    lastLogin: Optional[datetime] = None
+    createdAt: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class UserWithAccount(UserOut):
+    account: Optional[AccountOut] = None
+    
+    class Config:
+        from_attributes = True
