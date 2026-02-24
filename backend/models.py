@@ -40,6 +40,14 @@ class Account(Base):
     createdAt = Column(DateTime, server_default=func.now())
     
     user = relationship("User", back_populates="account")
+
+FISCAL_PERIOD_MAP = {
+    "October": "P1", "November": "P2", "December": "P3",
+    "January": "P4", "February": "P5", "March": "P6",
+    "April": "P7", "May": "P8", "June": "P9",
+    "July": "P10", "August": "P11", "September": "P12"
+}
+
 class RevenueExpense(Base):
     __tablename__ = "revenue_expenses"
 
@@ -48,11 +56,11 @@ class RevenueExpense(Base):
     code = Column(String, nullable=False)
     label = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
-    period = Column(String, nullable=False)       
     month = Column(String, nullable=False)
+    period = Column(String, nullable=False)   # auto-calculated from month
     value = Column(Float, nullable=False)
-    frequency = Column(String, nullable=False)    
-    type = Column(String, nullable=False)         
+    frequency = Column(String, nullable=False) # "periodic" | "year to date"
+    type = Column(String, nullable=False)      # "Actual" | "Budget"
     category = Column(String, nullable=False)
     createdAt = Column(DateTime, server_default=func.now())
     updatedAt = Column(DateTime, onupdate=func.now())
@@ -67,14 +75,13 @@ class AssetLiability(Base):
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)
     code = Column(String, nullable=False)
     label = Column(String, nullable=False)
-    category = Column(String, nullable=False)       
+    category = Column(String, nullable=False)    # "Assets" | "Liabilities"
     subCategory = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
-    period = Column(String, nullable=False)
     month = Column(String, nullable=False)
+    period = Column(String, nullable=False)      # auto-calculated
     value = Column(Float, nullable=False)
-    frequency = Column(String, nullable=True)
-    type = Column(String, nullable=True)
+    type = Column(String, nullable=True)         # "Actual" | "Budget"
     createdAt = Column(DateTime, server_default=func.now())
     updatedAt = Column(DateTime, onupdate=func.now())
 
@@ -90,9 +97,8 @@ class CashFlow(Base):
     label = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
     month = Column(String, nullable=False)
+    period = Column(String, nullable=False)      # auto-calculated
     value = Column(Float, nullable=False)
-    category = Column(String, nullable=False)
-    type = Column(String, nullable=False)        
     createdAt = Column(DateTime, server_default=func.now())
     updatedAt = Column(DateTime, onupdate=func.now())
 
@@ -106,13 +112,12 @@ class Supplier(Base):
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)
     vendorName = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    agingBucket = Column(String, nullable=True)
+    expenseCategory = Column(String, nullable=True)
     netDate = Column(DateTime, nullable=True)
     targetDate = Column(DateTime, nullable=True)
     year = Column(Integer, nullable=False)
     address = Column(String, nullable=True)
-    telephone = Column(String, nullable=True)
-    category = Column(String, nullable=True)
+    telephone = Column(String, nullable=True)   
     createdAt = Column(DateTime, server_default=func.now())
     updatedAt = Column(DateTime, onupdate=func.now())
 
@@ -126,8 +131,6 @@ class Customer(Base):
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)
     customerName = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
-    agingBucket = Column(String, nullable=True)
-    expenseCategory = Column(String, nullable=True)
     netDate = Column(DateTime, nullable=True)
     targetDate = Column(DateTime, nullable=True)
     year = Column(Integer, nullable=False)

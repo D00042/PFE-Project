@@ -175,11 +175,26 @@ def login(credentials: dict, db: Session = Depends(get_db)):
         "fullName": user.fullName
     }
 
-# REVENUE & EXPENSES 
+
+
+FISCAL_PERIOD_MAP = {
+    "October": "P1",  "November": "P2",  "December": "P3",
+    "January": "P4",  "February": "P5",  "March": "P6",
+    "April": "P7",    "May": "P8",       "June": "P9",
+    "July": "P10",    "August": "P11",   "September": "P12"
+}
+
+def get_period(month: str) -> str:
+    return FISCAL_PERIOD_MAP.get(month, "P1")
+
+
+# REVENUE & EXPENSES
 
 @app.post("/revenue-expenses", response_model=schemas.RevenueExpenseOut, status_code=201)
 def create_revenue_expense(entry: schemas.RevenueExpenseCreate, db: Session = Depends(get_db)):
-    new_entry = models.RevenueExpense(**entry.dict())
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = models.RevenueExpense(**data)
     db.add(new_entry)
     db.commit()
     db.refresh(new_entry)
@@ -201,7 +216,10 @@ def update_revenue_expense(entry_id: int, update: schemas.RevenueExpenseUpdate, 
     entry = db.query(models.RevenueExpense).filter(models.RevenueExpense.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
         setattr(entry, field, value)
     db.commit()
     db.refresh(entry)
@@ -217,11 +235,13 @@ def delete_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
     return {"message": "Entry deleted successfully"}
 
 
-# ASSETS & LIABILITIES 
+# ASSETS & LIABILITIES
 
 @app.post("/asset-liabilities", response_model=schemas.AssetLiabilityOut, status_code=201)
 def create_asset_liability(entry: schemas.AssetLiabilityCreate, db: Session = Depends(get_db)):
-    new_entry = models.AssetLiability(**entry.dict())
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = models.AssetLiability(**data)
     db.add(new_entry)
     db.commit()
     db.refresh(new_entry)
@@ -243,7 +263,10 @@ def update_asset_liability(entry_id: int, update: schemas.AssetLiabilityUpdate, 
     entry = db.query(models.AssetLiability).filter(models.AssetLiability.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
         setattr(entry, field, value)
     db.commit()
     db.refresh(entry)
@@ -259,11 +282,13 @@ def delete_asset_liability(entry_id: int, db: Session = Depends(get_db)):
     return {"message": "Entry deleted successfully"}
 
 
-# CASH FLOW ENDPOINTS 
+# CASH FLOW 
 
 @app.post("/cash-flows", response_model=schemas.CashFlowOut, status_code=201)
 def create_cash_flow(entry: schemas.CashFlowCreate, db: Session = Depends(get_db)):
-    new_entry = models.CashFlow(**entry.dict())
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = models.CashFlow(**data)
     db.add(new_entry)
     db.commit()
     db.refresh(new_entry)
@@ -285,7 +310,10 @@ def update_cash_flow(entry_id: int, update: schemas.CashFlowUpdate, db: Session 
     entry = db.query(models.CashFlow).filter(models.CashFlow.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
         setattr(entry, field, value)
     db.commit()
     db.refresh(entry)
@@ -301,7 +329,7 @@ def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
     return {"message": "Entry deleted successfully"}
 
 
-#  SUPPLIERS ENDPOINTS 
+#SUPPLIERS
 
 @app.post("/suppliers", response_model=schemas.SupplierOut, status_code=201)
 def create_supplier(entry: schemas.SupplierCreate, db: Session = Depends(get_db)):
@@ -343,7 +371,7 @@ def delete_supplier(entry_id: int, db: Session = Depends(get_db)):
     return {"message": "Entry deleted successfully"}
 
 
-#  CUSTOMERS ENDPOINTS 
+# CUSTOMERS
 
 @app.post("/customers", response_model=schemas.CustomerOut, status_code=201)
 def create_customer(entry: schemas.CustomerCreate, db: Session = Depends(get_db)):

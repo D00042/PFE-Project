@@ -44,20 +44,16 @@ class UserWithAccount(UserOut):
     
     class Config:
         from_attributes = True
-
-
-
-#REVENUE & EXPENSES 
+# REVENUE & EXPENSES 
 
 class RevenueExpenseCreate(BaseModel):
     code: str
     label: str
     year: int
-    period: str
     month: str
     value: float
-    frequency: str
-    type: str
+    frequency: str      # "periodic" | "year to date"
+    type: str           # "Actual" | "Budget"
     category: str
     userId: int
 
@@ -65,7 +61,6 @@ class RevenueExpenseUpdate(BaseModel):
     code: Optional[str] = None
     label: Optional[str] = None
     year: Optional[int] = None
-    period: Optional[str] = None
     month: Optional[str] = None
     value: Optional[float] = None
     frequency: Optional[str] = None
@@ -78,20 +73,19 @@ class RevenueExpenseOut(BaseModel):
     code: str
     label: str
     year: int
-    period: str
     month: str
+    period: str
     value: float
     frequency: str
     type: str
     category: str
     createdAt: Optional[datetime] = None
-    updatedAt: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-# ASSETS & LIABILITIES
+#  ASSETS & LIABILITIES 
 
 class AssetLiabilityCreate(BaseModel):
     code: str
@@ -99,11 +93,9 @@ class AssetLiabilityCreate(BaseModel):
     category: str
     subCategory: str
     year: int
-    period: str
     month: str
     value: float
-    frequency: Optional[str] = None
-    type: Optional[str] = None
+    type: Optional[str] = None  # "Actual" | "Budget"
     userId: int
 
 class AssetLiabilityUpdate(BaseModel):
@@ -112,10 +104,8 @@ class AssetLiabilityUpdate(BaseModel):
     category: Optional[str] = None
     subCategory: Optional[str] = None
     year: Optional[int] = None
-    period: Optional[str] = None
     month: Optional[str] = None
     value: Optional[float] = None
-    frequency: Optional[str] = None
     type: Optional[str] = None
 
 class AssetLiabilityOut(BaseModel):
@@ -126,10 +116,9 @@ class AssetLiabilityOut(BaseModel):
     category: str
     subCategory: str
     year: int
-    period: str
     month: str
+    period: str
     value: float
-    frequency: Optional[str] = None
     type: Optional[str] = None
     createdAt: Optional[datetime] = None
 
@@ -137,7 +126,8 @@ class AssetLiabilityOut(BaseModel):
         from_attributes = True
 
 
-#  CASH FLOW 
+#CASH FLOW 
+
 
 class CashFlowCreate(BaseModel):
     code: str
@@ -145,8 +135,6 @@ class CashFlowCreate(BaseModel):
     year: int
     month: str
     value: float
-    category: str
-    type: str
     userId: int
 
 class CashFlowUpdate(BaseModel):
@@ -155,8 +143,6 @@ class CashFlowUpdate(BaseModel):
     year: Optional[int] = None
     month: Optional[str] = None
     value: Optional[float] = None
-    category: Optional[str] = None
-    type: Optional[str] = None
 
 class CashFlowOut(BaseModel):
     id: int
@@ -165,65 +151,60 @@ class CashFlowOut(BaseModel):
     label: str
     year: int
     month: str
+    period: str
     value: float
-    category: str
-    type: str
     createdAt: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-# SUPPLIERS 
+#SUPPLIERS
 
 class SupplierCreate(BaseModel):
     vendorName: str
     amount: float
-    agingBucket: Optional[str] = None
+    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: int
     address: Optional[str] = None
     telephone: Optional[str] = None
-    category: Optional[str] = None
     userId: int
 
 class SupplierUpdate(BaseModel):
     vendorName: Optional[str] = None
     amount: Optional[float] = None
-    agingBucket: Optional[str] = None
+    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: Optional[int] = None
     address: Optional[str] = None
     telephone: Optional[str] = None
-    category: Optional[str] = None
 
 class SupplierOut(BaseModel):
     id: int
     userId: int
     vendorName: str
     amount: float
-    agingBucket: Optional[str] = None
+    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: int
     address: Optional[str] = None
     telephone: Optional[str] = None
-    category: Optional[str] = None
     createdAt: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-#CUSTOMERS 
+#  CUSTOMERS 
+
 
 class CustomerCreate(BaseModel):
     customerName: str
     amount: float
-    agingBucket: Optional[str] = None
-    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: int
@@ -234,8 +215,6 @@ class CustomerCreate(BaseModel):
 class CustomerUpdate(BaseModel):
     customerName: Optional[str] = None
     amount: Optional[float] = None
-    agingBucket: Optional[str] = None
-    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: Optional[int] = None
@@ -247,8 +226,6 @@ class CustomerOut(BaseModel):
     userId: int
     customerName: str
     amount: float
-    agingBucket: Optional[str] = None
-    expenseCategory: Optional[str] = None
     netDate: Optional[datetime] = None
     targetDate: Optional[datetime] = None
     year: int
