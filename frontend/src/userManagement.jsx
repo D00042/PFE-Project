@@ -18,13 +18,6 @@ function UserManagement() {
     role: 'Team Member',
     isActive: true
   });
-useEffect(() => {
-  const user = JSON.parse(localStorage.getItem('user'));
-  if (!user || user.role !== 'Team Leader') {
-    navigate('/dashboard'); 
-  }
-  fetchUsers();
-}, []);
 
 const navigate = useNavigate(); 
 

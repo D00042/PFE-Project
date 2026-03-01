@@ -170,12 +170,11 @@ deactivateUser: async (id) => {
 };
 
 export default authAPI;
-// ADD THESE TO YOUR EXISTING api.js, inside the authAPI export object
-// (or create a separate dataAPI export below authAPI)
+
 
 export const dataAPI = {
 
-  // ─── REVENUE & EXPENSES ──────────────────────────────────────────────────
+  //  REVENUE & EXPENSES
   createRevenueExpense: async (data) => {
     const response = await fetch(`${API_BASE_URL}/revenue-expenses`, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
@@ -199,7 +198,7 @@ export const dataAPI = {
     return handleResponse(response);
   },
 
-  // ─── ASSETS & LIABILITIES ────────────────────────────────────────────────
+  //  ASSETS & LIABILITIES 
   createAssetLiability: async (data) => {
     const response = await fetch(`${API_BASE_URL}/asset-liabilities`, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
@@ -223,7 +222,7 @@ export const dataAPI = {
     return handleResponse(response);
   },
 
-  // ─── CASH FLOW ───────────────────────────────────────────────────────────
+  // CASH FLOW
   createCashFlow: async (data) => {
     const response = await fetch(`${API_BASE_URL}/cash-flows`, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
@@ -247,7 +246,7 @@ export const dataAPI = {
     return handleResponse(response);
   },
 
-  // ─── SUPPLIERS ───────────────────────────────────────────────────────────
+  //  SUPPLIERS 
   createSupplier: async (data) => {
     const response = await fetch(`${API_BASE_URL}/suppliers`, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
@@ -271,7 +270,7 @@ export const dataAPI = {
     return handleResponse(response);
   },
 
-  // ─── CUSTOMERS ───────────────────────────────────────────────────────────
+  //  CUSTOMERS
   createCustomer: async (data) => {
     const response = await fetch(`${API_BASE_URL}/customers`, {
       method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),

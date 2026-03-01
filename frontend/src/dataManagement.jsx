@@ -523,10 +523,7 @@ function DataManagement() {
         </div>
         <div>
           <label className={lc} style={{ color: '#092A5E' }}>Telephone</label>
-          <input type="text" name="telephone" value={formData.telephone} onChange={handleChange} className={ic} placeholder="+216 XX XXX XXX" />
-        </div>
-        <div className="col-span-2 p-3 bg-blue-50 rounded-xl">
-          <p className="text-xs text-blue-600 font-semibold">ℹ Aging bucket will be calculated automatically from Net Date and Target Date</p>
+          <input type="text" name="telephone" value={formData.telephone} onChange={handleChange} className={ic} placeholder="+216 XX XX X XXX" />
         </div>
       </div>
     );
