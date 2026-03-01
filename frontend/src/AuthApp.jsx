@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -6,189 +7,105 @@ function AuthApp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [output, setOutput] = useState("");
-  const [user, setUser] = useState(null); // { email, role } after login
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [loading, setLoading] = useState(false);
 
-  // Create account form (leader only)
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState("member");
+  const navigate = useNavigate();
 
-  // Fetch /me when token exists (to get role and enforce 401)
+  // If already logged in, redirect straight to home
   useEffect(() => {
-    if (!token) {
-      setUser(null);
-      return;
+    const token = localStorage.getItem("token");
+    const user  = localStorage.getItem("user");
+    if (token && user) {
+      navigate("/home");
     }
-const fetchMe = async () => {
-  const res = await fetch(`${API_URL}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (res.status === 401) {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
-    setOutput("Session expired. Please log in again.");
-    return;
-  }
-  const data = await res.json();
-  const userData = { email: data.email, role: data.role };
-  setUser(userData);
-  localStorage.setItem('user', JSON.stringify(userData));  // ← ADD THIS LINE
-};
-    fetchMe();
-  }, [token]);
+  }, [navigate]);
 
   const login = async () => {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await response.json();
-    if (response.ok) {
+    setLoading(true);
+    setOutput("");
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setOutput("Login failed: " + (data.detail || JSON.stringify(data)));
+        return;
+      }
+
+      // Store token
       localStorage.setItem("token", data.access_token);
-      setToken(data.access_token);
-      setOutput("Logged in successfully. Fetching profile…");
-    } else {
-      setOutput("Login failed: " + (data.detail || JSON.stringify(data)));
+
+      // Fetch user profile to get role
+      const meRes = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+
+      if (meRes.status === 401) {
+        setOutput("Authentication failed. Please try again.");
+        localStorage.removeItem("token");
+        return;
+      }
+
+      const meData = await meRes.json();
+      const userData = { id: meData.id, email: meData.email, role: meData.role };
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      // Redirect to home
+      navigate("/home");
+
+    } catch (err) {
+      setOutput("Network error. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
-    setOutput("Logged out.");
+  // Allow Enter key to submit
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") login();
   };
-
-  const createAccount = async () => {
-    if (user?.role !== "leader") return;
-    const response = await fetch(`${API_URL}/auth/create-user`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        email: newEmail,
-        password: newPassword,
-        role: newRole,
-      }),
-    });
-    const data = await response.json();
-    if (response.ok) {
-      setOutput("Account created: " + newEmail);
-      setNewEmail("");
-      setNewPassword("");
-    } else if (response.status === 403) {
-      setOutput("403: Only leaders can create accounts.");
-    } else {
-      setOutput("Error: " + (data.detail || JSON.stringify(data)));
-    }
-  };
-
-  const callPanel = async (panel) => {
-    const response = await fetch(`${API_URL}/auth/${panel}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await response.json();
-    if (response.ok) {
-      setOutput(JSON.stringify(data, null, 2));
-    } else if (response.status === 401) {
-      setOutput("401: Not authenticated. Please log in.");
-      logout();
-    } else if (response.status === 403) {
-      setOutput("403: Not allowed for your role.");
-    } else {
-      setOutput("Error: " + (data.detail || JSON.stringify(data)));
-    }
-  };
-
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
         <img src="/Tui_logo.png" alt="TUI Logo" style={styles.logo} />
-        <h2 style={styles.title}>Authentication</h2>
+        <h2 style={styles.title}>Sign In</h2>
+        <p style={styles.subtitle}>Financial Intelligence Platform</p>
 
-        {!user ? (
-          <>
-            <input
-              style={styles.input}
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              style={styles.input}
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button style={styles.primaryButton} onClick={login}>
-              Login
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={styles.userInfo}>
-              Logged in as <strong>{user.email}</strong> ({user.role})
-            </p>
+        <input
+          style={styles.input}
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoComplete="email"
+        />
+        <input
+          style={styles.input}
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoComplete="current-password"
+        />
 
-            <div style={styles.actions}>
-              <button style={styles.panelButton} onClick={() => callPanel("member")}>
-                Member panel
-              </button>
-              <button style={styles.panelButton} onClick={() => callPanel("leader")}>
-                Leader panel
-              </button>
-              <button style={styles.panelButton} onClick={() => callPanel("manager")}>
-                Manager panel
-              </button>
-            </div>
+        <button
+          style={{ ...styles.primaryButton, opacity: loading ? 0.7 : 1 }}
+          onClick={login}
+          disabled={loading}
+        >
+          {loading ? "Signing in…" : "Sign In"}
+        </button>
 
-            {user.role === "leader" && (
-              <div style={styles.createAccount}>
-                <h3 style={styles.subtitle}>Create account (leader only)</h3>
-                <input
-                  style={styles.input}
-                  type="email"
-                  placeholder="New user email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                />
-                <input
-                  style={styles.input}
-                  type="password"
-                  placeholder="New user password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-                <select
-                  style={styles.input}
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                >
-                  <option value="member">member</option>
-                  <option value="leader">leader</option>
-                  <option value="manager">manager</option>
-                </select>
-                <button style={styles.primaryButton} onClick={createAccount}>
-                  Create account
-                </button>
-              </div>
-            )}
-
-            <button style={styles.logoutButton} onClick={logout}>
-              Logout
-            </button>
-          </>
+        {output && (
+          <pre style={styles.output}>{output}</pre>
         )}
-
-        <pre style={styles.output}>{output}</pre>
       </div>
     </div>
   );
@@ -206,94 +123,63 @@ const styles = {
   },
   card: {
     width: "420px",
-    padding: "40px",
-    borderRadius: "16px",
+    padding: "48px 40px",
+    borderRadius: "20px",
     backgroundColor: "#ffffff",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.10)",
     textAlign: "center",
   },
   logo: {
     width: "120px",
-    marginBottom: "20px",
+    marginBottom: "24px",
   },
   title: {
-    color: "#002B49",
-    marginBottom: "20px",
+    color: "#092A5E",
+    marginBottom: "4px",
+    fontSize: "24px",
+    fontWeight: "800",
   },
   subtitle: {
-    color: "#002B49",
-    fontSize: "14px",
-    marginBottom: "12px",
-  },
-  userInfo: {
-    color: "#002B49",
-    marginBottom: "16px",
-    fontSize: "14px",
+    color: "#9CA3AF",
+    fontSize: "13px",
+    marginBottom: "28px",
+    margin: "0 0 28px",
   },
   input: {
     width: "100%",
-    padding: "12px",
-    marginBottom: "12px",
-    borderRadius: "8px",
-    border: "1px solid #C3D7EE",
+    padding: "13px 16px",
+    marginBottom: "14px",
+    borderRadius: "12px",
+    border: "2px solid #E5E7EB",
     outline: "none",
     fontSize: "14px",
     boxSizing: "border-box",
+    fontFamily: "Arial, sans-serif",
+    transition: "border-color 0.2s",
   },
   primaryButton: {
     width: "100%",
-    padding: "12px",
-    backgroundColor: "#DA291C",
+    padding: "14px",
+    backgroundColor: "#D40E14",
     color: "#ffffff",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: "12px",
     cursor: "pointer",
     fontWeight: "bold",
-    marginBottom: "12px",
-  },
-  panelButton: {
-    flex: 1,
-    padding: "10px",
-    backgroundColor: "#6CACE4",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "12px",
-  },
-  actions: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
-  },
-  createAccount: {
-    marginBottom: "20px",
-    padding: "12px",
-    backgroundColor: "#f8f9fa",
-    borderRadius: "8px",
-    textAlign: "left",
-  },
-  logoutButton: {
-    width: "100%",
-    padding: "10px",
-    backgroundColor: "#FEDB00",
-    color: "#002B49",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "bold",
+    fontSize: "15px",
     marginBottom: "16px",
+    fontFamily: "Arial, sans-serif",
   },
   output: {
-    backgroundColor: "#002B49",
-    color: "#ffffff",
-    padding: "15px",
-    borderRadius: "8px",
+    backgroundColor: "#FEF2F2",
+    color: "#D40E14",
+    padding: "12px 15px",
+    borderRadius: "10px",
     textAlign: "left",
     fontSize: "12px",
-    minHeight: "60px",
+    border: "1px solid #FECACA",
     overflow: "auto",
+    whiteSpace: "pre-wrap",
   },
 };
 

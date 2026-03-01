@@ -4,52 +4,35 @@ import { authAPI } from '../services/api';
 import Logo from './components/Logo';
 
 function UserManagement() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const navigate  = useNavigate();
+  const [users, setUsers]       = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [message, setMessage]   = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: 'member',
-    is_active: true
-  });
-
-  const navigate = useNavigate();
+  const [formData, setFormData] = useState({ email:'', password:'', role:'member', is_active:true });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      navigate('/login');
-      return;
-    }
-    const user = JSON.parse(storedUser);
-    // Backend uses 'leader' role value (not 'Team Leader')
-    if (user.role !== 'leader') {
-      alert("Access Denied: Only Team Leaders can manage accounts.");
-      navigate('/dashboard');
+    const stored = localStorage.getItem('user');
+    if (!stored) { navigate('/login'); return; }
+    const user = JSON.parse(stored);
+    if (user.role !== 'leader' && user.role !== 'manager') {
+      alert('Access Denied: Only Team Leaders and Managers can manage accounts.');
+      navigate('/home');
       return;
     }
     fetchUsers();
   }, [navigate]);
 
   const fetchUsers = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const response = await authAPI.getAllUsers();
-      // handleResponse wraps in { data }, so actual array is response.data
-      // Backend returns an array directly, so this is correct
-      const usersArray = Array.isArray(response.data) ? response.data : [];
-      setUsers(usersArray);
-    } catch (err) {
-      setError('Failed to load users');
-    } finally {
-      setLoading(false);
-    }
+      setUsers(Array.isArray(response.data) ? response.data : []);
+    } catch { setError('Failed to load users'); }
+    finally { setLoading(false); }
   };
 
   const handleChange = (e) => {
@@ -57,257 +40,146 @@ function UserManagement() {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  const handleCreateClick = () => {
+  const openCreate = () => {
     setModalMode('create');
-    setFormData({ email: '', password: '', role: 'member', is_active: true });
-    setShowModal(true);
-    setError('');
-    setMessage('');
+    setFormData({ email:'', password:'', role:'member', is_active:true });
+    setShowModal(true); setError(''); setMessage('');
   };
 
-  const handleEditClick = (user) => {
-    setModalMode('edit');
-    setSelectedUser(user);
-    setFormData({
-      email: user.email,
-      password: '',
-      role: user.role,
-      is_active: user.is_active !== false
-    });
-    setShowModal(true);
-    setError('');
-    setMessage('');
+  const openEdit = (user) => {
+    setModalMode('edit'); setSelectedUser(user);
+    setFormData({ email:user.email, password:'', role:user.role, is_active: user.is_active !== false });
+    setShowModal(true); setError(''); setMessage('');
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
-
+    e.preventDefault(); setLoading(true); setError(''); setMessage('');
     try {
       if (modalMode === 'create') {
-        // Backend UserRegister schema: email, password, role only (no fullName)
-        await authAPI.register({
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-        });
+        await authAPI.register({ email:formData.email, password:formData.password, role:formData.role });
         setMessage('User created successfully!');
       } else {
-        const updateData = {
-          email: formData.email,
-          role: formData.role,
-          is_active: formData.is_active,
-          ...(formData.password && { password: formData.password })
-        };
+        const updateData = { email:formData.email, role:formData.role, is_active:formData.is_active, ...(formData.password && { password:formData.password }) };
         await authAPI.updateUser(selectedUser.id, updateData);
         setMessage('User updated successfully!');
       }
-
-      setTimeout(() => {
-        setShowModal(false);
-        setMessage('');
-        fetchUsers();
-      }, 1500);
+      setTimeout(() => { setShowModal(false); setMessage(''); fetchUsers(); }, 1500);
     } catch (err) {
       setError(err.response?.data?.detail || 'Operation failed');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleToggleActive = async (userId, currentStatus) => {
     const action = currentStatus ? 'deactivate' : 'activate';
     if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
-
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      if (currentStatus) {
-        await authAPI.deactivateUser(userId);
-      } else {
-        await authAPI.activateUser(userId);
-      }
+      if (currentStatus) await authAPI.deactivateUser(userId);
+      else               await authAPI.activateUser(userId);
       setMessage(`User ${action}d successfully!`);
       fetchUsers();
       setTimeout(() => setMessage(''), 3000);
-    } catch (err) {
-      setError(`Failed to ${action} user`);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError(`Failed to ${action} user`); }
+    finally { setLoading(false); }
   };
 
   const handleDelete = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
-
-    setLoading(true);
-    setError('');
+    if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+    setLoading(true); setError('');
     try {
       await authAPI.deleteUser(userId);
       setMessage('User deleted successfully!');
       fetchUsers();
       setTimeout(() => setMessage(''), 3000);
-    } catch (err) {
-      setError('Failed to delete user');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Failed to delete user'); }
+    finally { setLoading(false); }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
-
-  // Helper: map backend role value to display label
   const getRoleLabel = (role) => {
-    const labels = { leader: 'Team Leader', member: 'Team Member', manager: 'Manager' };
-    return labels[role] || role;
+    const map = { leader:'Team Leader', member:'Team Member', manager:'Manager' };
+    return map[role] || role;
+  };
+
+  const getRoleBadge = (role) => {
+    if (role === 'manager') return { backgroundColor:'#092A5E', color:'white' };
+    if (role === 'leader')  return { backgroundColor:'#70CBF4', color:'white' };
+    return { backgroundColor:'#E5E7EB', color:'#374151' };
   };
 
   return (
-    <div className="min-h-screen px-4 py-8" style={{ backgroundColor: '#f3f4f6' }}>
+    <div style={S.page}>
+
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <div className="bg-white rounded-3xl shadow-xl p-6" style={{ borderTop: '4px solid #092A5E' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Logo size="medium" />
-              <div>
-                <h1 className="text-2xl font-bold" style={{ color: '#092A5E' }}>Account Management</h1>
-                <p className="text-sm text-gray-600">Create, edit, activate and deactivate accounts</p>
-              </div>
+      <div style={S.header}>
+        <div style={S.headerInner}>
+          <div style={S.headerLeft}>
+            <Logo size="medium" />
+            <div style={S.divider} />
+            <div>
+              <p style={S.headerMeta}>Financial Intelligence Platform</p>
+              <p style={S.headerPageName}>Account Management</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-6 py-2 rounded-xl text-white font-semibold transition-all hover:opacity-90"
-              style={{ backgroundColor: '#D40E14' }}
-            >
-              Logout
-            </button>
+          </div>
+          <div style={S.headerRight}>
+            <button onClick={() => navigate('/home')} style={S.backBtn}>← Home</button>
+            <button onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }} style={S.logoutBtn}>Logout</button>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto">
-        {/* Action Bar */}
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            onClick={handleCreateClick}
-            className="px-6 py-3 rounded-xl text-white font-bold shadow-lg transition-all hover:shadow-xl"
-            style={{ backgroundColor: '#70CBF4' }}
-          >
-            + Create New Account
-          </button>
-          <button
-            onClick={fetchUsers}
-            className="px-6 py-3 rounded-xl border-2 font-semibold transition-all hover:bg-gray-50"
-            style={{ borderColor: '#092A5E', color: '#092A5E' }}
-          >
-            🔄 Refresh
-          </button>
+      <div style={S.body}>
+
+        {/* Action bar */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <button onClick={openCreate} style={S.addBtn}>+ Create New Account</button>
+          <button onClick={fetchUsers} style={S.refreshBtn}>↺ Refresh</button>
         </div>
 
         {/* Messages */}
-        {message && (
-          <div className="mb-6 p-4 rounded-xl border-l-4 bg-green-50 border-green-600 text-green-700">
-            {message}
-          </div>
-        )}
-        {error && (
-          <div className="mb-6 p-4 rounded-xl border-l-4" style={{ backgroundColor: '#fee2e2', borderLeftColor: '#D40E14', color: '#D40E14' }}>
-            {error}
-          </div>
-        )}
+        {message && <div style={S.msgSuccess}>{message}</div>}
+        {error   && <div style={S.msgError}>{error}</div>}
 
-        {/* Users Table */}
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead style={{ backgroundColor: '#092A5E' }}>
+        {/* Table */}
+        <div style={S.tableWrap}>
+          <div style={{ overflowX:'auto' }}>
+            <table style={S.table}>
+              <thead>
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-white">ID</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-white">Email</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-white">Role</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-white">Status</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-white">Actions</th>
+                  {['ID','Email','Role','Status','Actions'].map(col => (
+                    <th key={col} style={S.th}>{col}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {loading && users.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">Loading users...</td>
-                  </tr>
+                  <tr><td colSpan="5" style={S.tdEmpty}>Loading users…</td></tr>
                 ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">No users found</td>
+                  <tr><td colSpan="5" style={S.tdEmpty}>No users found</td></tr>
+                ) : users.map((user, i) => (
+                  <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? '#F9FAFB' : 'white' }}>
+                    <td style={S.td}>{user.id}</td>
+                    <td style={S.td}>{user.email}</td>
+                    <td style={S.td}>
+                      <span style={{ ...S.badge, ...getRoleBadge(user.role) }}>{getRoleLabel(user.role)}</span>
+                    </td>
+                    <td style={S.td}>
+                      <span style={{ ...S.badge, backgroundColor: user.is_active !== false ? '#16A34A' : '#D40E14', color:'white' }}>
+                        {user.is_active !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td style={S.td}>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => openEdit(user)} style={S.editBtn}>Edit</button>
+                        <button
+                          onClick={() => handleToggleActive(user.id, user.is_active !== false)}
+                          style={{ ...S.toggleBtn, backgroundColor: user.is_active !== false ? '#F59E0B' : '#16A34A' }}>
+                          {user.is_active !== false ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button onClick={() => handleDelete(user.id)} style={S.deleteBtn}>Delete</button>
+                      </div>
+                    </td>
                   </tr>
-                ) : (
-                  users.map((user, index) => (
-                    <tr key={user.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <td className="px-6 py-4 text-sm text-gray-900">{user.id}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-bold"
-                          style={{
-                            backgroundColor:
-                              user.role === 'manager' ? '#092A5E' :
-                              user.role === 'leader' ? '#70CBF4' : '#E5E7EB',
-                            color:
-                              user.role === 'manager' ? 'white' :
-                              user.role === 'leader' ? 'white' : '#374151'
-                          }}
-                        >
-                          {getRoleLabel(user.role)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-bold"
-                          style={{
-                            backgroundColor: user.is_active !== false ? '#10b981' : '#ef4444',
-                            color: 'white'
-                          }}
-                        >
-                          {user.is_active !== false ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditClick(user)}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
-                            style={{ backgroundColor: '#70CBF4', color: 'white' }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleToggleActive(user.id, user.is_active !== false)}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
-                            style={{
-                              backgroundColor: user.is_active !== false ? '#f59e0b' : '#10b981',
-                              color: 'white'
-                            }}
-                          >
-                            {user.is_active !== false ? 'Deactivate' : 'Activate'}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(user.id)}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
-                            style={{ backgroundColor: '#D40E14', color: 'white' }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -316,106 +188,45 @@ function UserManagement() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center px-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="px-8 pt-8 pb-6 text-center" style={{ backgroundColor: '#092A5E' }}>
-              <h2 className="text-2xl font-bold text-white">
-                {modalMode === 'create' ? 'Create New Account' : 'Edit Account'}
-              </h2>
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <div style={S.modalHeader}>
+              <h2 style={S.modalTitle}>{modalMode === 'create' ? 'Create New Account' : 'Edit Account'}</h2>
             </div>
+            <div style={S.modalBody}>
+              {message && <div style={{ ...S.msgSuccess, marginBottom:16 }}>{message}</div>}
+              {error   && <div style={{ ...S.msgError,   marginBottom:16 }}>{error}</div>}
 
-            <div className="px-8 py-6">
-              {message && (
-                <div className="mb-4 p-3 rounded-xl border-l-4 bg-green-50 border-green-600 text-green-700 text-sm">
-                  {message}
-                </div>
-              )}
-              {error && (
-                <div className="mb-4 p-3 rounded-xl border-l-4 text-sm" style={{ backgroundColor: '#fee2e2', borderLeftColor: '#D40E14', color: '#D40E14' }}>
-                  {error}
-                </div>
-              )}
+              <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2" style={{ color: '#092A5E' }}>
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="john.doe@tui.com"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-[#70CBF4]"
-                    required
-                  />
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <label style={F.label}>Email Address</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="john.doe@tui.com" style={F.input} required />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2" style={{ color: '#092A5E' }}>
-                    Role
-                  </label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-[#70CBF4] bg-white"
-                    required
-                  >
-                    {/* Values must match backend enum: 'member', 'leader', 'manager' */}
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <label style={F.label}>Role</label>
+                  <select name="role" value={formData.role} onChange={handleChange} style={F.input} required>
                     <option value="member">Team Member</option>
                     <option value="leader">Team Leader</option>
                     <option value="manager">Manager</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2" style={{ color: '#092A5E' }}>
-                    Password {modalMode === 'edit' && '(leave blank to keep current)'}
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none focus:border-[#70CBF4]"
-                    required={modalMode === 'create'}
-                  />
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <label style={F.label}>Password{modalMode === 'edit' ? ' (leave blank to keep current)' : ''}</label>
+                  <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" style={F.input} required={modalMode === 'create'} />
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                  <input
-                    type="checkbox"
-                    name="is_active"
-                    id="is_active"
-                    checked={formData.is_active}
-                    onChange={handleChange}
-                    className="w-5 h-5 rounded"
-                    style={{ accentColor: '#70CBF4' }}
-                  />
-                  <label htmlFor="is_active" className="text-sm font-semibold cursor-pointer" style={{ color: '#092A5E' }}>
-                    Account Active
-                  </label>
+                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', backgroundColor:'#F9FAFB', borderRadius:12 }}>
+                  <input type="checkbox" name="is_active" id="is_active" checked={formData.is_active} onChange={handleChange} style={{ width:18, height:18, accentColor:'#70CBF4', cursor:'pointer' }} />
+                  <label htmlFor="is_active" style={{ fontSize:13, fontWeight:700, color:'#092A5E', cursor:'pointer' }}>Account Active</label>
                 </div>
 
-                <div className="flex space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="flex-1 py-3 rounded-xl border-2 font-semibold transition-all hover:bg-gray-50"
-                    style={{ borderColor: '#092A5E', color: '#092A5E' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 py-3 rounded-xl text-white font-bold transition-all"
-                    style={{ backgroundColor: loading ? '#a3d9f0' : '#70CBF4' }}
-                  >
-                    {loading ? 'Saving...' : modalMode === 'create' ? 'Create' : 'Update'}
+                <div style={{ display:'flex', gap:12, marginTop:8 }}>
+                  <button type="button" onClick={() => setShowModal(false)} style={S.cancelBtn}>Cancel</button>
+                  <button type="submit" disabled={loading} style={{ ...S.submitBtn, opacity: loading ? 0.6 : 1 }}>
+                    {loading ? 'Saving…' : modalMode === 'create' ? 'Create' : 'Update'}
                   </button>
                 </div>
               </form>
@@ -426,5 +237,46 @@ function UserManagement() {
     </div>
   );
 }
+
+// ── Form tokens ───────────────────────────────────────────────────────────────
+const F = {
+  label: { fontSize:11, fontWeight:700, color:'#092A5E', textTransform:'uppercase', letterSpacing:'0.06em' },
+  input: { padding:'11px 14px', border:'2px solid #E5E7EB', borderRadius:10, fontSize:13, outline:'none', fontFamily:'Arial, sans-serif', width:'100%', boxSizing:'border-box', backgroundColor:'white' },
+};
+
+// ── Page style tokens (mirrors Accueil + DataManagement) ─────────────────────
+const S = {
+  page:       { minHeight:'100vh', backgroundColor:'#F3F4F6', fontFamily:'Arial, sans-serif' },
+  body:       { maxWidth:1100, margin:'0 auto', padding:'32px 24px 60px' },
+  header:     { backgroundColor:'white', borderBottom:'1px solid #E5E7EB', padding:'0 24px' },
+  headerInner:{ maxWidth:1100, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', height:72 },
+  headerLeft: { display:'flex', alignItems:'center', gap:16 },
+  headerRight:{ display:'flex', alignItems:'center', gap:10 },
+  divider:    { width:1, height:36, backgroundColor:'#E5E7EB' },
+  headerMeta: { margin:0, fontSize:11, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:600 },
+  headerPageName:{ margin:0, fontSize:15, color:'#092A5E', fontWeight:700 },
+  backBtn:    { padding:'8px 18px', backgroundColor:'white', color:'#092A5E', border:'2px solid #092A5E', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer' },
+  logoutBtn:  { padding:'8px 20px', backgroundColor:'#D40E14', color:'white', border:'none', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer' },
+  addBtn:     { padding:'11px 22px', backgroundColor:'#70CBF4', color:'white', border:'none', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer' },
+  refreshBtn: { padding:'11px 16px', border:'2px solid #092A5E', borderRadius:12, fontSize:13, fontWeight:700, color:'#092A5E', cursor:'pointer', backgroundColor:'white' },
+  msgSuccess: { padding:'12px 16px', backgroundColor:'#F0FDF4', borderLeft:'4px solid #16A34A', borderRadius:10, fontSize:13, color:'#15803D', marginBottom:16 },
+  msgError:   { padding:'12px 16px', backgroundColor:'#FEF2F2', borderLeft:'4px solid #D40E14', borderRadius:10, fontSize:13, color:'#D40E14', marginBottom:16 },
+  tableWrap:  { backgroundColor:'white', borderRadius:20, boxShadow:'0 2px 12px rgba(0,0,0,0.07)', overflow:'hidden' },
+  table:      { width:'100%', borderCollapse:'collapse', fontSize:13 },
+  th:         { padding:'14px 16px', textAlign:'left', fontSize:11, fontWeight:700, color:'white', textTransform:'uppercase', letterSpacing:'0.06em', backgroundColor:'#092A5E', whiteSpace:'nowrap' },
+  td:         { padding:'12px 16px', color:'#374151', whiteSpace:'nowrap', borderBottom:'1px solid #F3F4F6' },
+  tdEmpty:    { padding:'48px 16px', textAlign:'center', color:'#9CA3AF', fontSize:14 },
+  badge:      { padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700 },
+  editBtn:    { padding:'6px 14px', backgroundColor:'#70CBF4', color:'white', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' },
+  toggleBtn:  { padding:'6px 14px', color:'white', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' },
+  deleteBtn:  { padding:'6px 14px', backgroundColor:'#D40E14', color:'white', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' },
+  overlay:    { position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, zIndex:50 },
+  modal:      { backgroundColor:'white', borderRadius:24, boxShadow:'0 20px 60px rgba(0,0,0,0.2)', width:'100%', maxWidth:480 },
+  modalHeader:{ padding:'24px 32px', backgroundColor:'#092A5E', borderRadius:'24px 24px 0 0' },
+  modalTitle: { margin:0, fontSize:18, fontWeight:800, color:'white' },
+  modalBody:  { padding:'28px 32px' },
+  cancelBtn:  { flex:1, padding:'13px', border:'2px solid #092A5E', borderRadius:12, fontSize:14, fontWeight:700, color:'#092A5E', cursor:'pointer', backgroundColor:'white' },
+  submitBtn:  { flex:1, padding:'13px', border:'none', borderRadius:12, fontSize:14, fontWeight:700, color:'white', cursor:'pointer', backgroundColor:'#70CBF4' },
+};
 
 export default UserManagement;
