@@ -2,14 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database.db import engine, Base
 from models import user
-from routes import auth
+from models import data_models
+from routes import auth, data
 
 app = FastAPI()
 
-# Create tables
 Base.metadata.create_all(bind=engine)
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -18,10 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
 app.include_router(auth.router)
-
+app.include_router(data.router)
 
 @app.get("/")
 def home():
-    return {"message": "Backend running 🚀"}
+    return {"message": "Backend running!"}

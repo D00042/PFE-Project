@@ -1,0 +1,243 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from database.db import get_db
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Supplier, Customer
+from schemas.data import (
+    RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
+    AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
+    CashFlowCreate, CashFlowUpdate, CashFlowOut,
+    SupplierCreate, SupplierUpdate, SupplierOut,
+    CustomerCreate, CustomerUpdate, CustomerOut
+)
+
+router = APIRouter(tags=["data"])
+
+FISCAL_PERIOD_MAP = {
+    "October": "P1", "November": "P2", "December": "P3",
+    "January": "P4", "February": "P5", "March": "P6",
+    "April": "P7", "May": "P8", "June": "P9",
+    "July": "P10", "August": "P11", "September": "P12"
+}
+
+def get_period(month: str) -> str:
+    return FISCAL_PERIOD_MAP.get(month, "P1")
+
+# REVENUE & EXPENSES
+
+@router.post("/revenue-expenses", response_model=RevenueExpenseOut, status_code=201)
+def create_revenue_expense(entry: RevenueExpenseCreate, db: Session = Depends(get_db)):
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = RevenueExpense(**data)
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@router.get("/revenue-expenses", response_model=list[RevenueExpenseOut])
+def get_all_revenue_expenses(db: Session = Depends(get_db)):
+    return db.query(RevenueExpense).all()
+
+@router.get("/revenue-expenses/{entry_id}", response_model=RevenueExpenseOut)
+def get_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@router.put("/revenue-expenses/{entry_id}", response_model=RevenueExpenseOut)
+def update_revenue_expense(entry_id: int, update: RevenueExpenseUpdate, db: Session = Depends(get_db)):
+    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.delete("/revenue-expenses/{entry_id}")
+def delete_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+# ASSETS & LIABILITIES
+
+@router.post("/asset-liabilities", response_model=AssetLiabilityOut, status_code=201)
+def create_asset_liability(entry: AssetLiabilityCreate, db: Session = Depends(get_db)):
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = AssetLiability(**data)
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@router.get("/asset-liabilities", response_model=list[AssetLiabilityOut])
+def get_all_asset_liabilities(db: Session = Depends(get_db)):
+    return db.query(AssetLiability).all()
+
+@router.get("/asset-liabilities/{entry_id}", response_model=AssetLiabilityOut)
+def get_asset_liability(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@router.put("/asset-liabilities/{entry_id}", response_model=AssetLiabilityOut)
+def update_asset_liability(entry_id: int, update: AssetLiabilityUpdate, db: Session = Depends(get_db)):
+    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.delete("/asset-liabilities/{entry_id}")
+def delete_asset_liability(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+# CASH FLOW
+
+@router.post("/cash-flows", response_model=CashFlowOut, status_code=201)
+def create_cash_flow(entry: CashFlowCreate, db: Session = Depends(get_db)):
+    data = entry.dict()
+    data["period"] = get_period(data["month"])
+    new_entry = CashFlow(**data)
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@router.get("/cash-flows", response_model=list[CashFlowOut])
+def get_all_cash_flows(db: Session = Depends(get_db)):
+    return db.query(CashFlow).all()
+
+@router.get("/cash-flows/{entry_id}", response_model=CashFlowOut)
+def get_cash_flow(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@router.put("/cash-flows/{entry_id}", response_model=CashFlowOut)
+def update_cash_flow(entry_id: int, update: CashFlowUpdate, db: Session = Depends(get_db)):
+    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    data = update.dict(exclude_unset=True)
+    if "month" in data:
+        data["period"] = get_period(data["month"])
+    for field, value in data.items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.delete("/cash-flows/{entry_id}")
+def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+# SUPPLIERS
+
+@router.post("/suppliers", response_model=SupplierOut, status_code=201)
+def create_supplier(entry: SupplierCreate, db: Session = Depends(get_db)):
+    new_entry = Supplier(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@router.get("/suppliers", response_model=list[SupplierOut])
+def get_all_suppliers(db: Session = Depends(get_db)):
+    return db.query(Supplier).all()
+
+@router.get("/suppliers/{entry_id}", response_model=SupplierOut)
+def get_supplier(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@router.put("/suppliers/{entry_id}", response_model=SupplierOut)
+def update_supplier(entry_id: int, update: SupplierUpdate, db: Session = Depends(get_db)):
+    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.delete("/suppliers/{entry_id}")
+def delete_supplier(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+# CUSTOMERS
+
+@router.post("/customers", response_model=CustomerOut, status_code=201)
+def create_customer(entry: CustomerCreate, db: Session = Depends(get_db)):
+    new_entry = Customer(**entry.dict())
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    return new_entry
+
+@router.get("/customers", response_model=list[CustomerOut])
+def get_all_customers(db: Session = Depends(get_db)):
+    return db.query(Customer).all()
+
+@router.get("/customers/{entry_id}", response_model=CustomerOut)
+def get_customer(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(Customer).filter(Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@router.put("/customers/{entry_id}", response_model=CustomerOut)
+def update_customer(entry_id: int, update: CustomerUpdate, db: Session = Depends(get_db)):
+    entry = db.query(Customer).filter(Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for field, value in update.dict(exclude_unset=True).items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@router.delete("/customers/{entry_id}")
+def delete_customer(entry_id: int, db: Session = Depends(get_db)):
+    entry = db.query(Customer).filter(Customer.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
