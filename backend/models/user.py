@@ -15,4 +15,3 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.member)
     is_active = Column(Boolean, default=True)
-
