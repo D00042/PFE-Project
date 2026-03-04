@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.data_models import RevenueExpense, AssetLiability, CashFlow, Supplier, Customer
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Supplier, Customer, Client, calculate_aging
 from schemas.data import (
     RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
     AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
     SupplierCreate, SupplierUpdate, SupplierOut,
-    CustomerCreate, CustomerUpdate, CustomerOut
+    CustomerCreate, CustomerUpdate, CustomerOut,
+    ClientCreate, ClientUpdate, ClientOut,
 )
-
 router = APIRouter(tags=["data"])
 
 FISCAL_PERIOD_MAP = {
@@ -240,4 +240,54 @@ def delete_customer(entry_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Entry not found")
     db.delete(entry)
     db.commit()
+    return {"message": "Entry deleted successfully"}
+
+
+
+@router.post("/clients", response_model=ClientOut, status_code=201)
+def create_client(entry: ClientCreate, db: Session = Depends(get_db)):
+    data = entry.dict()
+    net, tgt = data.get("netDate"), data.get("targetDate")
+    aging_days, aging_year = calculate_aging(net, tgt)
+    days_out = None
+    if net and tgt:
+        n = net.date() if hasattr(net, 'date') else net
+        t = tgt.date() if hasattr(tgt, 'date') else tgt
+        days_out = (t - n).days if t > n else 0
+    db_entry = Client(**data, daysOutstanding=days_out, agingDays=aging_days, agingYear=aging_year)
+    db.add(db_entry); db.commit(); db.refresh(db_entry)
+    return db_entry
+
+@router.get("/clients", response_model=list[ClientOut])
+def get_all_clients(db: Session = Depends(get_db)):
+    return db.query(Client).all()
+
+@router.get("/clients/{entry_id}", response_model=ClientOut)
+def get_client(entry_id: int, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    return e
+
+@router.put("/clients/{entry_id}", response_model=ClientOut)
+def update_client(entry_id: int, update: ClientUpdate, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    data = update.dict(exclude_unset=True)
+    for k, v in data.items(): setattr(e, k, v)
+    if "netDate" in data or "targetDate" in data:
+        aging_days, aging_year = calculate_aging(e.netDate, e.targetDate)
+        net, tgt = e.netDate, e.targetDate
+        if net and tgt:
+            n = net.date() if hasattr(net, 'date') else net
+            t = tgt.date() if hasattr(tgt, 'date') else tgt
+            e.daysOutstanding = (t - n).days if t > n else 0
+        e.agingDays = aging_days; e.agingYear = aging_year
+    db.commit(); db.refresh(e)
+    return e
+
+@router.delete("/clients/{entry_id}")
+def delete_client(entry_id: int, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(e); db.commit()
     return {"message": "Entry deleted successfully"}

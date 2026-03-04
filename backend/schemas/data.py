@@ -187,3 +187,51 @@ class CustomerOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ADD THIS at the bottom of your existing schemas/data.py
+
+EXPENSE_CATEGORIES = [
+    "General costs", "Other Business travel", "Other Insurance",
+    "Professional fees", "Rents and leases", "Software licence",
+]
+
+class ClientCreate(BaseModel):
+    clientName:      str
+    clientType:      str
+    amount:          float
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            int
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
+    userId:          int
+
+class ClientUpdate(BaseModel):
+    clientName:      Optional[str]      = None
+    clientType:      Optional[str]      = None
+    amount:          Optional[float]    = None
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            Optional[int]      = None
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
+
+class ClientOut(BaseModel):
+    id:              int
+    userId:          int
+    clientName:      str
+    clientType:      str
+    amount:          float
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            int
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
+    daysOutstanding: Optional[int]      = None
+    agingDays:       Optional[str]      = None
+    agingYear:       Optional[int]      = None
+    createdAt:       Optional[datetime] = None
+    class Config: from_attributes = True
