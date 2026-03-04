@@ -67,34 +67,6 @@ class CashFlow(Base):
     createdAt = Column(DateTime, server_default=func.now())
     updatedAt = Column(DateTime, onupdate=func.now())
 
-class Supplier(Base):
-    __tablename__ = "suppliers"
-    id              = Column(Integer, primary_key=True, index=True)
-    userId          = Column(Integer, ForeignKey("users.id"), nullable=False)
-    vendorName      = Column(String, nullable=False)
-    amount          = Column(Float, nullable=False)
-    expenseCategory = Column(String, nullable=True)
-    netDate         = Column(DateTime, nullable=True)
-    targetDate      = Column(DateTime, nullable=True)
-    year            = Column(Integer, nullable=False)
-    address         = Column(String, nullable=True)
-    telephone       = Column(String, nullable=True)
-    createdAt       = Column(DateTime, server_default=func.now())
-    updatedAt       = Column(DateTime, onupdate=func.now())
-
-class Customer(Base):
-    __tablename__ = "customers"
-    id           = Column(Integer, primary_key=True, index=True)
-    userId       = Column(Integer, ForeignKey("users.id"), nullable=False)
-    customerName = Column(String, nullable=False)
-    amount       = Column(Float, nullable=False)
-    netDate      = Column(DateTime, nullable=True)
-    targetDate   = Column(DateTime, nullable=True)
-    year         = Column(Integer, nullable=False)
-    address      = Column(String, nullable=True)
-    telephone    = Column(String, nullable=True)
-    createdAt    = Column(DateTime, server_default=func.now())
-    updatedAt    = Column(DateTime, onupdate=func.now())
 
 # NEW — Client merges Supplier + Customer
 class Client(Base):

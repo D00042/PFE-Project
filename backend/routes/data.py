@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.data_models import RevenueExpense, AssetLiability, CashFlow, Supplier, Customer, Client, calculate_aging
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client, calculate_aging
 from schemas.data import (
     RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
     AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
-    SupplierCreate, SupplierUpdate, SupplierOut,
-    CustomerCreate, CustomerUpdate, CustomerOut,
     ClientCreate, ClientUpdate, ClientOut,
 )
 router = APIRouter(tags=["data"])
@@ -159,89 +157,6 @@ def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
     db.delete(entry)
     db.commit()
     return {"message": "Entry deleted successfully"}
-
-# SUPPLIERS
-
-@router.post("/suppliers", response_model=SupplierOut, status_code=201)
-def create_supplier(entry: SupplierCreate, db: Session = Depends(get_db)):
-    new_entry = Supplier(**entry.dict())
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/suppliers", response_model=list[SupplierOut])
-def get_all_suppliers(db: Session = Depends(get_db)):
-    return db.query(Supplier).all()
-
-@router.get("/suppliers/{entry_id}", response_model=SupplierOut)
-def get_supplier(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/suppliers/{entry_id}", response_model=SupplierOut)
-def update_supplier(entry_id: int, update: SupplierUpdate, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/suppliers/{entry_id}")
-def delete_supplier(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
-# CUSTOMERS
-
-@router.post("/customers", response_model=CustomerOut, status_code=201)
-def create_customer(entry: CustomerCreate, db: Session = Depends(get_db)):
-    new_entry = Customer(**entry.dict())
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/customers", response_model=list[CustomerOut])
-def get_all_customers(db: Session = Depends(get_db)):
-    return db.query(Customer).all()
-
-@router.get("/customers/{entry_id}", response_model=CustomerOut)
-def get_customer(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/customers/{entry_id}", response_model=CustomerOut)
-def update_customer(entry_id: int, update: CustomerUpdate, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/customers/{entry_id}")
-def delete_customer(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
 
 
 @router.post("/clients", response_model=ClientOut, status_code=201)
