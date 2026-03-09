@@ -8,6 +8,8 @@ from schemas.data import (
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
     ClientCreate, ClientUpdate, ClientOut,
 )
+from core.dependencies import get_current_user
+from models.user import User
 router = APIRouter(tags=["data"])
 
 FISCAL_PERIOD_MAP = {
@@ -158,6 +160,7 @@ def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Entry deleted successfully"}
 
+# CLIENTS
 
 @router.post("/clients", response_model=ClientOut, status_code=201)
 def create_client(entry: ClientCreate, db: Session = Depends(get_db)):
@@ -206,3 +209,118 @@ def delete_client(entry_id: int, db: Session = Depends(get_db)):
     if not e: raise HTTPException(status_code=404, detail="Entry not found")
     db.delete(e); db.commit()
     return {"message": "Entry deleted successfully"}
+
+@router.get("/dashboard/profitability")
+def get_profitability_dashboard(
+    year: int,
+    db: Session = Depends(get_db),
+):
+    # Current year entries
+    current = db.query(RevenueExpense).filter(RevenueExpense.year == year).all()
+    # Previous year for comparison
+    previous = db.query(RevenueExpense).filter(RevenueExpense.year == year - 1).all()
+
+    def sum_by_label(entries, label):
+        return sum(e.value or 0 for e in entries if e.label == label)
+
+    def sum_by_type(entries, type_):
+        return sum(e.value or 0 for e in entries if e.type == type_)
+
+    def sum_by_category(entries, category):
+        return sum(e.value or 0 for e in entries
+               if e.label == "Other Overheads" and e.category == category)
+
+    # ── KPI values ──
+    rev_curr  = sum_by_label(current,  "Revenue")
+    rev_prev  = sum_by_label(previous, "Revenue")
+    ebit_curr = sum_by_label(current,  "EBIT")
+    ebit_prev = sum_by_label(previous, "EBIT")
+    retained_curr = sum_by_label(current,  "Retained Profit/(loss)")
+    retained_prev = sum_by_label(previous, "Retained Profit/(loss)")
+    total_assets_curr = 0
+    staff_cur = sum_by_label(current,  "Staff Costs")
+    staff_prev = sum_by_label(previous,  "Staff Costs")
+    # roa and roe can only be calculated when we have asset/liability data so we'll set it to 0 for now
+    gross_margin_curr = round((rev_curr - staff_cur)
+                               / rev_curr * 100, 2) if rev_curr else 0
+    gross_margin_prev = round((rev_prev - staff_prev)
+                               / rev_prev * 100, 2) if rev_prev else 0
+    ebit_margin_curr  = round(ebit_curr / rev_curr * 100, 2) if rev_curr else 0
+    ebit_margin_prev  = round(ebit_prev / rev_prev * 100, 2) if rev_prev else 0
+    net_margin_curr   = round(retained_curr / rev_curr * 100, 2) if rev_curr else 0
+    net_margin_prev   = round(retained_prev / rev_prev * 100, 2) if rev_prev else 0
+    roa_curr = 0
+    roe_curr = 0
+
+    # ── P&L Summary rows (current vs previous) ──
+    pl_labels = [
+        "Revenue", "Staff Costs", "Overhead Depreciation",
+        "Other Overheads", "Total Miscellaneous Overheads",
+        "EBIT", "Interest", "Retained Profit/(loss)"
+    ]
+    pl_summary = [
+        {
+            "label": lbl,
+            "current": round(sum_by_label(current, lbl), 2),
+            "previous": round(sum_by_label(previous, lbl), 2),
+        }
+        for lbl in pl_labels
+    ]
+
+    # ── Other Overheads breakdown by category ──
+    overhead_categories = [
+    "Property Costs",
+    "Communication Costs",
+    "Travel And Entertainment", 
+    "Office Costs",
+    "Computer Costs",
+    "Professional Fees",
+]
+
+    overheads_detail = [
+        {
+            "category": cat,
+            "current":  round(sum_by_category(current, cat), 2),
+            "previous": round(sum_by_category(previous, cat), 2),
+        }
+        for cat in overhead_categories
+    ]
+
+    # ── Monthly revenue trend ──
+    fiscal_months = [
+        "October","November","December","January",
+        "February","March","April","May",
+        "June","July","August","September"
+    ]
+    monthly_trend = []
+    for m in fiscal_months:
+        rev = sum(e.value for e in current if e.label == "Revenue" and e.month == m)
+        exp = sum(e.value for e in current if e.label not in ("Revenue",) and e.month == m)
+        ebt = sum(e.value for e in current if e.label == "EBIT"    and e.month == m)
+        monthly_trend.append({
+            "month":   m[:3],
+            "revenue": round(rev, 2),
+            "expenses":round(exp, 2),
+            "ebit":    round(ebt, 2),
+        })
+
+    # ── Profitability funnel ──
+    funnel = [
+        {"name": "Gross Profit Margin", "value": abs(gross_margin_curr)},
+        {"name": "EBIT Margin",         "value": abs(ebit_margin_curr)},
+        {"name": "Net Profit Margin",   "value": abs(net_margin_curr)},
+    ]
+
+    return {
+        "kpis": {
+            "grossMargin":    {"current": gross_margin_curr, "previous": gross_margin_prev},
+            "ebitMargin":     {"current": ebit_margin_curr,  "previous": ebit_margin_prev},
+            "netProfitMargin":{"current": net_margin_curr,   "previous": net_margin_prev},
+            "roa":            {"current": roa_curr,          "previous": 0},
+            "totalRevenue":   {"current": round(rev_curr,2), "previous": round(rev_prev,2)},
+        },
+        "plSummary":       pl_summary,
+        "overheadsDetail": overheads_detail,
+        "monthlyTrend":    monthly_trend,
+        "funnel":          funnel,
+    }

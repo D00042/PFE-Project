@@ -63,7 +63,7 @@ export default function UserManagement() {
         await authAPI.create(form);
         setMessage(`Account created! Credentials sent to ${form.email}.`);
       } else {
-        // Never send password from edit form
+        
         const { password: _p, ...updateData } = form;
         await authAPI.update(selectedUser.id, updateData);
         setMessage('Account updated successfully!');

@@ -3,6 +3,7 @@ import AuthApp from './AuthApp'
 import Accueil from './Accueil'
 import DataManagement from './dataManagement'
 import UserManagement from './userManagement'
+import ProfitabilityDashboard from "./ProfitabilityDashboard";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/data"  element={<DataManagement />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/"      element={<Navigate to="/login" />} />
+        <Route path="/home/dashboard/profitability" element={<ProfitabilityDashboard />} />
       </Routes>
     </BrowserRouter>
   )
