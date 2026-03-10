@@ -6,6 +6,7 @@ function Accueil() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [visible, setVisible] = useState(false);
+  
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -30,7 +31,7 @@ function Accueil() {
     if (role === 'leader')  return { backgroundColor: '#70CBF4', color: 'white' };
     return { backgroundColor: '#E5E7EB', color: '#374151' };
   };
-
+  // define cards(models) with role based access
   const allCards = [
     {
       key: 'data', roles: ['member', 'leader', 'manager'],
@@ -63,7 +64,7 @@ function Accueil() {
           <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
         </svg>
       ),
-      route: '/dashboard', color: '#FEDB00', lightBg: '#FFFBEA', label: 'View Dashboards',
+      route: 'dashboard/profitability', color: '#FEDB00', lightBg: '#FFFBEA', label: 'View Dashboards',
     },
     {
       key: 'access', roles: ['manager'],

@@ -68,7 +68,7 @@ class CashFlow(Base):
     updatedAt = Column(DateTime, onupdate=func.now())
 
 
-# NEW — Client merges Supplier + Customer
+#  Client merges Supplier + Customer
 class Client(Base):
     __tablename__ = "clients"
     id              = Column(Integer, primary_key=True, index=True)
