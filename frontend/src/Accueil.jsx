@@ -31,7 +31,7 @@ function Accueil() {
     if (role === 'leader')  return { backgroundColor: '#70CBF4', color: 'white' };
     return { backgroundColor: '#E5E7EB', color: '#374151' };
   };
-
+  // define cards(models) with role based access
   const allCards = [
     {
       key: 'data', roles: ['member', 'leader', 'manager'],

@@ -45,6 +45,7 @@ const ASSET_LIABILITY_CODES = {
   'BST213000T': { label: 'Non-current trade and other receivables', category: 'Assets', subCategory: 'SB Non-current Assets' },
   'BST210000T': { label: 'SB Non-current assets', category: 'Assets', subCategory: 'SB Non-current Assets' },
   'BST223100T': { label: 'Trade receivables', category: 'Assets', subCategory: 'SB Current Assets' },
+  'BST223000T': { label: 'Current trade and other receivables', category: 'Assets', subCategory: 'SB Current Assets' },
   'BST223300T': { label: 'Current prepayments', category: 'Assets', subCategory: 'SB Current Assets' },
   'BST223155T': { label: 'Current other assets - non-financial instruments', category: 'Assets', subCategory: 'SB Current Assets' },
   'BST224000T': { label: 'Current income tax recoverable', category: 'Assets', subCategory: 'SB Current Assets' },
