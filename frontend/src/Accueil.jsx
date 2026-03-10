@@ -44,7 +44,7 @@ function Accueil() {
       route: '/data', color: '#70CBF4', lightBg: '#EBF7FE', label: 'Go to Data',
     },
     {
-      key: 'users', roles: ['leader', 'manager'],
+      key: 'users', roles: ['leader'],
       title: 'Account Management',
       description: 'Create, activate, deactivate, and edit user accounts. Assign roles to control access across the platform.',
       icon: (

@@ -1,15 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.data_models import RevenueExpense, AssetLiability, CashFlow, Supplier, Customer
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client, calculate_aging
 from schemas.data import (
     RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
     AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
-    SupplierCreate, SupplierUpdate, SupplierOut,
-    CustomerCreate, CustomerUpdate, CustomerOut
+    ClientCreate, ClientUpdate, ClientOut,
 )
-
 router = APIRouter(tags=["data"])
 
 FISCAL_PERIOD_MAP = {
@@ -160,84 +158,51 @@ def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Entry deleted successfully"}
 
-# SUPPLIERS
 
-@router.post("/suppliers", response_model=SupplierOut, status_code=201)
-def create_supplier(entry: SupplierCreate, db: Session = Depends(get_db)):
-    new_entry = Supplier(**entry.dict())
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
+@router.post("/clients", response_model=ClientOut, status_code=201)
+def create_client(entry: ClientCreate, db: Session = Depends(get_db)):
+    data = entry.dict()
+    net, tgt = data.get("netDate"), data.get("targetDate")
+    aging_days, aging_year = calculate_aging(net, tgt)
+    days_out = None
+    if net and tgt:
+        n = net.date() if hasattr(net, 'date') else net
+        t = tgt.date() if hasattr(tgt, 'date') else tgt
+        days_out = (t - n).days if t > n else 0
+    db_entry = Client(**data, daysOutstanding=days_out, agingDays=aging_days, agingYear=aging_year)
+    db.add(db_entry); db.commit(); db.refresh(db_entry)
+    return db_entry
 
-@router.get("/suppliers", response_model=list[SupplierOut])
-def get_all_suppliers(db: Session = Depends(get_db)):
-    return db.query(Supplier).all()
+@router.get("/clients", response_model=list[ClientOut])
+def get_all_clients(db: Session = Depends(get_db)):
+    return db.query(Client).all()
 
-@router.get("/suppliers/{entry_id}", response_model=SupplierOut)
-def get_supplier(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
+@router.get("/clients/{entry_id}", response_model=ClientOut)
+def get_client(entry_id: int, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    return e
 
-@router.put("/suppliers/{entry_id}", response_model=SupplierOut)
-def update_supplier(entry_id: int, update: SupplierUpdate, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
+@router.put("/clients/{entry_id}", response_model=ClientOut)
+def update_client(entry_id: int, update: ClientUpdate, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    data = update.dict(exclude_unset=True)
+    for k, v in data.items(): setattr(e, k, v)
+    if "netDate" in data or "targetDate" in data:
+        aging_days, aging_year = calculate_aging(e.netDate, e.targetDate)
+        net, tgt = e.netDate, e.targetDate
+        if net and tgt:
+            n = net.date() if hasattr(net, 'date') else net
+            t = tgt.date() if hasattr(tgt, 'date') else tgt
+            e.daysOutstanding = (t - n).days if t > n else 0
+        e.agingDays = aging_days; e.agingYear = aging_year
+    db.commit(); db.refresh(e)
+    return e
 
-@router.delete("/suppliers/{entry_id}")
-def delete_supplier(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Supplier).filter(Supplier.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
-# CUSTOMERS
-
-@router.post("/customers", response_model=CustomerOut, status_code=201)
-def create_customer(entry: CustomerCreate, db: Session = Depends(get_db)):
-    new_entry = Customer(**entry.dict())
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/customers", response_model=list[CustomerOut])
-def get_all_customers(db: Session = Depends(get_db)):
-    return db.query(Customer).all()
-
-@router.get("/customers/{entry_id}", response_model=CustomerOut)
-def get_customer(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/customers/{entry_id}", response_model=CustomerOut)
-def update_customer(entry_id: int, update: CustomerUpdate, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    for field, value in update.dict(exclude_unset=True).items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/customers/{entry_id}")
-def delete_customer(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(Customer).filter(Customer.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
+@router.delete("/clients/{entry_id}")
+def delete_client(entry_id: int, db: Session = Depends(get_db)):
+    e = db.query(Client).filter(Client.id == entry_id).first()
+    if not e: raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(e); db.commit()
     return {"message": "Entry deleted successfully"}

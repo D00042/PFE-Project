@@ -30,6 +30,10 @@ function AuthApp() {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
+      if (response.status === 403) {
+        setOutput("Your account has been disabled. Please contact your Team Leader.");
+        return;
+      }
 
       if (!response.ok) {
         setOutput("Login failed: " + (data.detail || JSON.stringify(data)));

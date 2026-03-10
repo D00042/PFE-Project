@@ -113,77 +113,50 @@ class CashFlowOut(BaseModel):
     class Config:
         from_attributes = True
 
-# SUPPLIERS
 
-class SupplierCreate(BaseModel):
-    vendorName: str
-    amount: float
-    expenseCategory: Optional[str] = None
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: int
-    address: Optional[str] = None
-    telephone: Optional[str] = None
-    userId: int
 
-class SupplierUpdate(BaseModel):
-    vendorName: Optional[str] = None
-    amount: Optional[float] = None
-    expenseCategory: Optional[str] = None
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: Optional[int] = None
-    address: Optional[str] = None
-    telephone: Optional[str] = None
+EXPENSE_CATEGORIES = [
+    "General costs", "Other Business travel", "Other Insurance",
+    "Professional fees", "Rents and leases", "Software licence",
+]
 
-class SupplierOut(BaseModel):
-    id: int
-    userId: int
-    vendorName: str
-    amount: float
-    expenseCategory: Optional[str] = None
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: int
-    address: Optional[str] = None
-    telephone: Optional[str] = None
-    createdAt: Optional[datetime] = None
+class ClientCreate(BaseModel):
+    clientName:      str
+    clientType:      str
+    amount:          float
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            int
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
+    userId:          int
 
-    class Config:
-        from_attributes = True
+class ClientUpdate(BaseModel):
+    clientName:      Optional[str]      = None
+    clientType:      Optional[str]      = None
+    amount:          Optional[float]    = None
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            Optional[int]      = None
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
 
-# CUSTOMERS
-
-class CustomerCreate(BaseModel):
-    customerName: str
-    amount: float
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: int
-    address: Optional[str] = None
-    telephone: Optional[str] = None
-    userId: int
-
-class CustomerUpdate(BaseModel):
-    customerName: Optional[str] = None
-    amount: Optional[float] = None
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: Optional[int] = None
-    address: Optional[str] = None
-    telephone: Optional[str] = None
-
-class CustomerOut(BaseModel):
-    id: int
-    userId: int
-    customerName: str
-    amount: float
-    netDate: Optional[datetime] = None
-    targetDate: Optional[datetime] = None
-    year: int
-    address: Optional[str] = None
-    telephone: Optional[str] = None
-    createdAt: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+class ClientOut(BaseModel):
+    id:              int
+    userId:          int
+    clientName:      str
+    clientType:      str
+    amount:          float
+    expenseCategory: Optional[str]      = None
+    netDate:         Optional[datetime] = None
+    targetDate:      Optional[datetime] = None
+    year:            int
+    address:         Optional[str]      = None
+    telephone:       Optional[str]      = None
+    daysOutstanding: Optional[int]      = None
+    agingDays:       Optional[str]      = None
+    agingYear:       Optional[int]      = None
+    createdAt:       Optional[datetime] = None
+    class Config: from_attributes = True
