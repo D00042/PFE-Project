@@ -89,7 +89,7 @@ function BarCard({ title, subtitle, data, height = 260, currentColor = COLORS.te
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} margin={{ bottom: 32, left: 0, right: 8 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-28} textAnchor="end" interval={0} />
+          <XAxis dataKey="label" tick={{ fontSize: 9 }} />
           <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} width={54} />
           <Tooltip formatter={(v) => fmtFull(v)} />
           <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
@@ -343,7 +343,7 @@ export default function BalanceSheetDashboard() {
             <ResponsiveContainer width="100%" height={460}>
               <BarChart data={charts?.totalAssets ?? []} margin={{ bottom: 30 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
                 <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} width={52} />
                 <Tooltip formatter={(v) => fmtFull(v)} />
                 <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
@@ -370,7 +370,7 @@ export default function BalanceSheetDashboard() {
     <ResponsiveContainer width="100%" height={460}>
       <BarChart data={charts?.totalEquity ?? []} margin={{ bottom: 30 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
+        <XAxis dataKey="label" tick={{ fontSize: 9 }} />
         <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} width={52} />
         <Tooltip formatter={(v) => fmtFull(v)} />
         <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
@@ -404,6 +404,7 @@ export default function BalanceSheetDashboard() {
           title="Non-Current Assets Details"
           data={charts?.nonCurrentAssetsDetail ?? []}
           height={220}
+          
         />
         <HBarCard
           title="Current Assets Details"
@@ -464,7 +465,7 @@ const S = {
   row2:        { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 28px 16px" },
   row3:        { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, padding: "0 28px 16px" },
   chartCard:   { background: "white", borderRadius: 16, padding: "16px 18px", boxShadow: "0 2px 12px rgba(9,42,94,0.08)" },
-  chartTitle:  { color: COLORS.navy, fontSize: 13, fontWeight: 700, margin: "0 0 2px" },
+  chartTitle: { color: COLORS.navy, fontSize: 13, fontWeight: 700, margin: "0 0 8px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   chartSub:    { color: COLORS.grey, fontSize: 10, margin: "0 0 8px", lineHeight: 1.4 },
   legendRow:   { display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 10 },
   dot: (color) => ({ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }),

@@ -248,7 +248,7 @@ export default function ProfitabilityDashboard() {
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={plSummary} margin={{ bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={0} />
+              <XAxis dataKey="label" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip formatter={(v) => fmtFull(v)} />
               <Bar dataKey="current"  name="Current Year"  fill={COLORS.teal}      radius={[4,4,0,0]} />

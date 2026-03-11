@@ -323,7 +323,7 @@ def get_profitability_dashboard(
         exp = sum(e.value for e in current  if e.label not in ("Revenue",) and e.month == m)
         ebt = sum(e.value for e in current  if e.label == "EBIT"    and e.month == m)
         monthly_trend.append({
-            "month":    m[:3],
+            "month":    FISCAL_PERIOD_MAP[m],
             "revenue":  round(rev, 2),
             "expenses": round(exp, 2),
             "ebit":     round(ebt, 2),
