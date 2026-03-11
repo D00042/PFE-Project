@@ -13,7 +13,7 @@ const authAPI = {
   deactivate: (id)       => fetch(`${API_BASE}/auth/users/${id}/deactivate`, { method:'PATCH', headers: headers() }).then(r => r.json()),
 };
 
-const TEAMS = ['Finance', 'Accounting', 'Controlling', 'HR', 'IT', 'Management'];
+const TEAMS = ['Record-to-Report', 'Purchase-to-Pay', 'Order-to-Cash'];
 
 export default function UserManagement() {
   const navigate = useNavigate();
