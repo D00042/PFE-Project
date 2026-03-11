@@ -3,20 +3,27 @@ import { useNavigate } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LabelList,
-  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 const API_URL = "http://127.0.0.1:8000";
 
 const COLORS = {
+  // Brand
   blue:      "#1A6FBF",
   blueLight: "#A8C8E8",
   navy:      "#092A5E",
   red:       "#D40E14",
   green:     "#16A34A",
   grey:      "#9CA3AF",
+  // Chart series — more variety
+  teal:      "#0D9488",
+  tealLight: "#99E6E0",
+  amber:     "#D97706",
+  amberLight:"#FCD34D",
+  purple:    "#7C3AED",
+  purpleLight:"#C4B5FD",
 };
-const PIE_COLORS = ["#1A6FBF", "#70CBF4", "#092A5E", "#A8C8E8", "#D6E8F7"];
+const PIE_COLORS = ["#0D9488", "#1A6FBF", "#D97706", "#7C3AED", "#092A5E"];
 
 const FISCAL_PERIODS = [
   { period: "P1",  month: "October"   }, { period: "P2",  month: "November"  },
@@ -64,7 +71,7 @@ function KpiBar({ value, prevValue, unit = "", up, formatter, maxVal = 100 }) {
 }
 
 // ── Reusable grouped bar chart card ──────────────────────────────────────────
-function BarCard({ title, subtitle, data, height = 260 }) {
+function BarCard({ title, subtitle, data, height = 260, currentColor = COLORS.teal, prevColor = COLORS.tealLight }) {
   if (!data || data.length === 0) return (
     <div style={S.chartCard}>
       <p style={S.chartTitle}>{title}</p>
@@ -76,8 +83,8 @@ function BarCard({ title, subtitle, data, height = 260 }) {
       <p style={S.chartTitle}>{title}</p>
       {subtitle && <p style={S.chartSub}>{subtitle}</p>}
       <div style={S.legendRow}>
-        <span style={S.dot(COLORS.blue)} /><span style={S.legendText}>Current Year</span>
-        <span style={S.dot(COLORS.blueLight)} /><span style={S.legendText}>Previous Year</span>
+        <span style={S.dot(currentColor)} /><span style={S.legendText}>Current Year</span>
+        <span style={S.dot(prevColor)} /><span style={S.legendText}>Previous Year</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} margin={{ bottom: 32, left: 0, right: 8 }}>
@@ -98,7 +105,7 @@ function BarCard({ title, subtitle, data, height = 260 }) {
 }
 
 // ── Horizontal bar card (better for long labels) ──────────────────────────────
-function HBarCard({ title, subtitle, data, height = 280 }) {
+function HBarCard({ title, subtitle, data, height = 280, currentColor = COLORS.teal, prevColor = COLORS.tealLight }) {
   if (!data || data.length === 0) return (
     <div style={S.chartCard}>
       <p style={S.chartTitle}>{title}</p>
@@ -110,8 +117,8 @@ function HBarCard({ title, subtitle, data, height = 280 }) {
       <p style={S.chartTitle}>{title}</p>
       {subtitle && <p style={S.chartSub}>{subtitle}</p>}
       <div style={S.legendRow}>
-        <span style={S.dot(COLORS.blue)} /><span style={S.legendText}>Current Year</span>
-        <span style={S.dot(COLORS.blueLight)} /><span style={S.legendText}>Previous Year</span>
+        <span style={S.dot(currentColor)} /><span style={S.legendText}>Current Year</span>
+<span style={S.dot(prevColor)} /><span style={S.legendText}>Previous Year</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} layout="vertical" margin={{ left: 8, right: 40 }}>
@@ -119,10 +126,12 @@ function HBarCard({ title, subtitle, data, height = 280 }) {
           <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={fmt} />
           <YAxis type="category" dataKey="label" tick={{ fontSize: 9 }} width={200} />
           <Tooltip formatter={(v) => fmtFull(v)} />
-          <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[0,4,4,0]}>
+          <Bar dataKey="current"  name="Current Year"  fill={currentColor} radius={[4,4,0,0]}>
+
             <LabelList dataKey="current"  position="right" formatter={fmt} style={{ fontSize: 8, fill: COLORS.navy }} />
           </Bar>
-          <Bar dataKey="previous" name="Previous Year" fill={COLORS.blueLight} radius={[0,4,4,0]} />
+          <Bar dataKey="previous" name="Previous Year" fill={prevColor}    radius={[4,4,0,0]}/>
+
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -228,13 +237,7 @@ export default function BalanceSheetDashboard() {
         <span style={S.currencyLabel}>Actual Values in EUR</span>
       </div>
 
-      {/* ── Snapshot banner — explains BS semantics vs P&L cumulation ───── */}
-      {period !== "P12" && (
-        <div style={S.ytdBanner}>
-          📋 Showing balance sheet <strong>snapshot as of {snapshotMonth ?? period}</strong> —
-          unlike P&amp;L, balance sheet values are point-in-time, not cumulative
-        </div>
-      )}
+      
 
       {/* ══════════════════════════════════════════════════════════════════
           ROW 1 — 5 KPI cards
@@ -250,7 +253,7 @@ export default function BalanceSheetDashboard() {
           </div>
           <KpiBar value={equityRatio.current} prevValue={equityRatio.previous} unit="%" up={equityUp} maxVal={100} />
           <div style={{ ...S.kpiDelta, color: equityUp ? COLORS.green : COLORS.red }}>
-            {equityUp ? "▲" : "▼"} {Math.abs(equityRatio.current - equityRatio.previous).toFixed(1)}pp vs prev
+            {equityUp ? "▲" : "▼"} {Math.abs(equityRatio.current - equityRatio.previous).toFixed(1)}% vs prev
           </div>
         </div>
 
@@ -277,13 +280,13 @@ export default function BalanceSheetDashboard() {
             </svg>
             <p style={S.kpiTitle}>Current Ratio</p>
           </div>
-          <p style={{ fontSize: 26, fontWeight: 900, color: crColor, margin: "6px 0 2px" }}>{currentRatio.current.toFixed(2)}x</p>
-          <p style={{ fontSize: 11, color: COLORS.grey, margin: "0 0 4px" }}>Prev: {currentRatio.previous.toFixed(2)}x</p>
+          <p style={{ fontSize: 26, fontWeight: 900, color: crColor, margin: "6px 0 2px" }}>{currentRatio.current.toFixed(2)}</p>
+          <p style={{ fontSize: 11, color: COLORS.grey, margin: "0 0 4px" }}>Prev: {currentRatio.previous.toFixed(2)}</p>
           <p style={{ fontSize: 10, color: crColor, fontWeight: 700, margin: 0 }}>
             {currentRatio.current >= 2 ? "● Healthy" : currentRatio.current >= 1 ? "● Adequate" : "● Below 1 — Risk"}
           </p>
           <div style={{ ...S.kpiDelta, color: currentRatio.current >= currentRatio.previous ? COLORS.green : COLORS.red }}>
-            {currentRatio.current >= currentRatio.previous ? "▲" : "▼"} {Math.abs(currentRatio.current - currentRatio.previous).toFixed(2)}x vs prev
+            {currentRatio.current >= currentRatio.previous ? "▲" : "▼"} {Math.abs(currentRatio.current - currentRatio.previous).toFixed(2)} vs prev
           </div>
         </div>
 
@@ -294,13 +297,13 @@ export default function BalanceSheetDashboard() {
             </svg>
             <p style={S.kpiTitle}>Debt / Equity</p>
           </div>
-          <p style={{ fontSize: 26, fontWeight: 900, color: deColor, margin: "6px 0 2px" }}>{debtToEquity.current.toFixed(2)}x</p>
-          <p style={{ fontSize: 11, color: COLORS.grey, margin: "0 0 4px" }}>Prev: {debtToEquity.previous.toFixed(2)}x</p>
+          <p style={{ fontSize: 26, fontWeight: 900, color: deColor, margin: "6px 0 2px" }}>{debtToEquity.current.toFixed(2)}</p>
+          <p style={{ fontSize: 11, color: COLORS.grey, margin: "0 0 4px" }}>Prev: {debtToEquity.previous.toFixed(2)}</p>
           <p style={{ fontSize: 10, color: deColor, fontWeight: 700, margin: 0 }}>
             {debtToEquity.current <= 1 ? "● Low leverage" : debtToEquity.current <= 2 ? "● Moderate" : "● High leverage"}
           </p>
           <div style={{ ...S.kpiDelta, color: deUp ? COLORS.green : COLORS.red }}>
-            {deUp ? "▼ improved" : "▲ increased"} {Math.abs(debtToEquity.current - debtToEquity.previous).toFixed(2)}x vs prev
+            {deUp ? "▼ improved" : "▲ increased"} {Math.abs(debtToEquity.current - debtToEquity.previous).toFixed(2)} vs prev
           </div>
         </div>
 
@@ -392,21 +395,18 @@ export default function BalanceSheetDashboard() {
           ROW 3 — Detailed breakdowns (the data that was hidden before)
       ══════════════════════════════════════════════════════════════════ */}
       <div style={S.section}>
-        <p style={S.sectionHeading}>🔍 Detailed Breakdowns</p>
-        <p style={S.sectionSub}>Every line item from your data, broken down by category</p>
+        <p style={S.sectionHeading}>Detailed Breakdowns By Category</p>
       </div>
 
       {/* Non-current assets + current assets side by side as horizontal bars */}
       <div style={S.row2}>
         <HBarCard
-          title="Non-Current Assets — Line Items"
-          subtitle="Intangibles, PP&E, Right of Use, Non-current receivables"
+          title="Non-Current Assets Details"
           data={charts?.nonCurrentAssetsDetail ?? []}
           height={220}
         />
         <HBarCard
-          title="Current Assets — Line Items"
-          subtitle="Trade receivables, Cash, Prepayments, Other current assets"
+          title="Current Assets Details"
           data={charts?.currentAssetsDetail ?? []}
           height={220}
         />
@@ -415,64 +415,19 @@ export default function BalanceSheetDashboard() {
       {/* Equity + current liabilities side by side */}
       <div style={S.row2}>
         <HBarCard
-          title="Equity — Detail"
-          subtitle="Equity holders of parent vs total reserves"
+          title="Equity Details"
           data={charts?.equityDetail ?? []}
           height={180}
         />
         <HBarCard
-          title="Current Liabilities — Line Items"
-          subtitle="Trade payables, prepayments received, tax, lease liabilities"
+          title="Current Liabilities Details"
           data={charts?.currentLiabilitiesDetail ?? []}
           height={250}
         />
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          ROW 4 — Analysis charts
-      ══════════════════════════════════════════════════════════════════ */}
-      <div style={S.section}>
-        <p style={S.sectionHeading}>📈 Analysis</p>
-      </div>
-      <div style={S.row3}>
 
-        {/* Asset Structure */}
-        <BarCard
-          title="Asset Structure"
-          subtitle="Non-Current vs Current — how the mix is shifting"
-          data={charts?.assetStructure ?? []}
-          height={260}
-        />
-
-        {/* Current Assets Breakdown — Donut */}
-        <div style={S.chartCard}>
-          <p style={S.chartTitle}>Current Assets Mix</p>
-          <p style={S.chartSub}>What your current assets consist of this period</p>
-          {pieData.length === 0 ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 260, color: COLORS.grey, fontSize: 13 }}>No data</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={pieData} dataKey="current" nameKey="label"
-                  cx="50%" cy="45%" outerRadius={90} innerRadius={48} paddingAngle={3}>
-                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(v, name) => [fmtFull(v), name]} />
-                <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Trade position */}
-        <BarCard
-          title="Trade Receivables vs Payables"
-          subtitle="What customers owe you vs what you owe suppliers"
-          data={charts?.tradePosition ?? []}
-          height={260}
-        />
-
-      </div>
+     
 
     </div>
   );
@@ -495,7 +450,6 @@ const S = {
   periodTab:       { padding: "4px 8px", borderRadius: 5, border: "1px solid #CBD5E1", background: "white", cursor: "pointer", fontSize: 11, fontFamily: "Arial, sans-serif", color: "#374151" },
   periodTabActive: { padding: "4px 8px", borderRadius: 5, border: "none", background: COLORS.red, cursor: "pointer", fontSize: 11, fontFamily: "Arial, sans-serif", color: "white", fontWeight: 700 },
   currencyLabel:   { marginLeft: "auto", color: COLORS.navy, fontSize: 13, fontWeight: 700 },
-  ytdBanner: { margin: "8px 28px 0", padding: "8px 16px", background: "#EFF6FF", borderLeft: "3px solid #1A6FBF", borderRadius: 8, fontSize: 12, color: "#1e3a5f" },
   kpiRow:  { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, padding: "16px 28px" },
   kpiCard: { background: "white", borderRadius: 16, padding: "14px 18px", boxShadow: "0 2px 12px rgba(9,42,94,0.08)" },
   kpiHeader: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
