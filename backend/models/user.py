@@ -1,5 +1,6 @@
 import enum
 from sqlalchemy import Column, Integer, String, Boolean, Enum
+from sqlalchemy.orm import relationship
 from database.db import Base
 
 class UserRole(str, enum.Enum):
@@ -17,3 +18,5 @@ class User(Base):
     fullName        = Column(String, nullable=True)
     telephone       = Column(String, nullable=True)
     team            = Column(String, nullable=True)
+    # inside class User:
+    dashboard_permissions = relationship("DashboardPermission", back_populates="user", uselist=False)

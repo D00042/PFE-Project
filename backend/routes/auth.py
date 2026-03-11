@@ -6,7 +6,7 @@ from schemas.auth import UserRegister, UserLogin, UserUpdate, PasswordResetReque
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from schemas.auth import ChangePassword
 from core.security import (
     hash_password,
     verify_password,
@@ -15,9 +15,44 @@ from core.security import (
     verify_password_reset_token
 )
 from core.dependencies import get_current_user, require_roles
-
+from core.email import send_password_changed_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
+# Add this function anywhere before create_user
+def _send_credentials_email(email: str, full_name: str, password: str):
+    """Sends login credentials to a newly created user."""
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from core.email import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Your TUI Platform Account"
+        msg["From"]    = FROM_EMAIL
+        msg["To"]      = email
+
+        body = f"""
+        <html><body style="font-family:sans-serif;color:#1a2b4a;">
+          <h2 style="color:#E8002D;">Welcome to TUI Financial Platform</h2>
+          <p>Hello {full_name},</p>
+          <p>Your account has been created. Here are your credentials:</p>
+          <p><strong>Email:</strong> {email}</p>
+          <p><strong>Password:</strong> {password}</p>
+          <p>Please log in and change your password immediately.</p>
+          <p style="color:#888;font-size:12px;">TUI Financial Intelligence Platform</p>
+        </body></html>
+        """
+        msg.attach(MIMEText(body, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(FROM_EMAIL, email, msg.as_string())
+
+    except Exception as e:
+        print(f"[email] Failed to send credentials to {email}: {e}")
 
 # ================= CREATE USER (Leader only) =================
 @router.post("/create-user")
@@ -251,45 +286,39 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 
 # ================= RESET PASSWORD =================
 @router.post("/reset-password")
-def reset_password(data: PasswordResetConfirm, db: Session = Depends(get_db)):
-    email = verify_password_reset_token(data.token)
+def reset_password(token: str, new_password: str, db: Session = Depends(get_db)):
 
-    if not email:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    payload = decode_token(token)
+    email = payload.get("sub")
 
     user = db.query(User).filter(User.email == email).first()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user.hashed_password = hash_password(new_password)
 
-    user.hashed_password = hash_password(data.new_password)
     db.commit()
 
-    return {"message": "Password successfully reset"}
+    return {"message": "Password reset successfully"}
 
 
+@router.post("/change-password")
+def change_password(
+    data: ChangePassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not verify_password(data.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
 
-def _send_credentials_email(to_email: str, full_name: str, password: str):
+    current_user.hashed_password = hash_password(data.new_password)
+    db.commit()
+
+    # DEBUG — remove after fixing
+    print(f"[debug] Sending email to: {current_user.email}, name: {current_user.fullName}")
+    
     try:
-        SMTP_USER = "your_email@gmail.com"      # ← replace
-        SMTP_PASS = "your_app_password"          # ← replace
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Your TUI Finance Platform Account"
-        msg["From"]    = f"TUI Finance <{SMTP_USER}>"
-        msg["To"]      = to_email
-        html = f"""<html><body style="font-family:Arial,sans-serif;">
-          <h2 style="color:#092A5E;">Welcome, {full_name}!</h2>
-          <p>Your account has been created.</p>
-          <div style="background:#F3F4F6;padding:16px;border-radius:8px;">
-            <p><strong>Email:</strong> {to_email}</p>
-            <p><strong>Password:</strong> {password}</p>
-          </div>
-          <p>Please log in and change your password.</p>
-        </body></html>"""
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP("smtp.gmail.com", 587) as s:
-            s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(SMTP_USER, to_email, msg.as_string())
+        send_password_changed_email(current_user.email, current_user.fullName or "")
+        print("[debug] Email sent successfully")
     except Exception as e:
-        print(f"[EMAIL] Could not send: {e}")
+        print(f"[debug] Email failed: {e}")   # ← this will show the real error
+
+    return {"message": "Password updated successfully"}

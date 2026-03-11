@@ -249,6 +249,29 @@ def get_profitability_dashboard(
     def sum_by_category(entries, category):
         return sum(e.value or 0 for e in entries
                if e.label == "Other Overheads" and e.category == category)
+   
+    snapshot_month = active_months[-1]
+
+    assets_curr = db.query(AssetLiability).filter(
+        AssetLiability.year == year,
+        AssetLiability.month == snapshot_month
+    ).all()
+    assets_prev = db.query(AssetLiability).filter(
+        AssetLiability.year == year - 1,
+        AssetLiability.month == snapshot_month
+    ).all()
+
+    def ss_assets(entries, subcategory):
+        return sum(e.value or 0 for e in entries
+                   if (e.subCategory or "").strip().lower() == subcategory.strip().lower())
+
+    non_curr_assets_c = ss_assets(assets_curr, "SB Non-current Assets")
+    non_curr_assets_p = ss_assets(assets_prev, "SB Non-current Assets")
+    curr_assets_c     = ss_assets(assets_curr, "SB Current Assets")
+    curr_assets_p     = ss_assets(assets_prev, "SB Current Assets")
+    total_assets_c    = non_curr_assets_c + curr_assets_c
+    total_assets_p    = non_curr_assets_p + curr_assets_p
+
 
     rev_curr      = sum_by_label(current,  "Revenue")
     rev_prev      = sum_by_label(previous, "Revenue")
@@ -317,7 +340,12 @@ def get_profitability_dashboard(
             "grossMargin":    {"current": gross_margin_curr, "previous": gross_margin_prev},
             "ebitMargin":     {"current": ebit_margin_curr,  "previous": ebit_margin_prev},
             "netProfitMargin":{"current": net_margin_curr,   "previous": net_margin_prev},
-            "roa":            {"current": 0,                 "previous": 0},
+            "roa": {
+                "current":  round(retained_curr / total_assets_c * 100, 2) if total_assets_c else 0,
+                "previous": round(retained_prev / total_assets_p * 100, 2) if total_assets_p else 0,},
+            "roe": {
+                "current":  round(retained_curr / non_curr_assets_c * 100, 2) if non_curr_assets_c else 0,
+                "previous": round(retained_prev / non_curr_assets_p * 100, 2) if non_curr_assets_p else 0,},
             "totalRevenue":   {"current": round(rev_curr,2), "previous": round(rev_prev,2)},
         },
         "plSummary":       pl_summary,
