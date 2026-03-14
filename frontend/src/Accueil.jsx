@@ -64,7 +64,7 @@ function Accueil() {
           <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
         </svg>
       ),
-      route: 'dashboard/profitability', color: '#FEDB00', lightBg: '#FFFBEA', label: 'View Dashboards',
+      route: '/home/dashboard/profitability', color: '#FEDB00', lightBg: '#FFFBEA', label: 'View Dashboards',
     },
     {
       key: 'access', roles: ['manager'],
@@ -112,11 +112,11 @@ function Accueil() {
       <div style={{ ...S.hero, opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(16px)' }}>
         <div style={S.heroInner}>
           <div style={S.heroAccent} />
-          <h1 style={S.heroHeading}>Hello, {user.email.split('@')[0]}</h1>
+          <h1 style={S.heroHeading}>Hello,</h1>
           <p style={S.heroSub}>Welcome to the TUI Financial Intelligence Platform. Select a module below to get started.</p>
         </div>
       </div>
-
++
       {/* Body */}
       <div style={S.body}>
 
