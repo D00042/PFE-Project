@@ -134,6 +134,8 @@ export default function DSODPODashboard() {
   if (!data) return null;
 
   const { kpis, customerAging, supplierAging, topCustomers, topSuppliers, customerDelayDist, supplierDelayDist } = data;
+  const filteredCustomerAging = customerAging.filter(d => d.amount > 0);
+const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
 
   const dso = kpis.dso?.current ?? 0;
   const dpo = kpis.dpo?.current ?? 0;
@@ -195,15 +197,15 @@ export default function DSODPODashboard() {
             <div style={S.miniCard}>
               <p style={S.miniTitle}>Customer Aging Overdue</p>
               <ResponsiveContainer width={220} height={160}>
-                <BarChart data={customerAging.filter(d => d.amount > 0)} margin={{ top: 16 }}>
+                <BarChart data={filteredCustomerAging} margin={{ top: 16 }}>
                   <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]}
                     label={{ position: "top", fontSize: 8, formatter: fmt }}>
-                    {customerAging.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
-                    ))}
+                    {filteredCustomerAging.map((_, i) => (
+  <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
+))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
