@@ -719,7 +719,7 @@ FISCAL_MONTHS_DSO = [
 ]
 PERIOD_TO_IDX_DSO = {f"P{i+1}": i for i in range(12)}
 
-
+    
 @router.get("/dashboard/dso-dpo")
 def get_dso_dpo_dashboard(
     year:   int = 2025,
@@ -791,18 +791,19 @@ def get_dso_dpo_dashboard(
 
     # ── Aging buckets ─────────────────────────────────────────────────────
     aging_buckets = [
-        "Not due", "0-30 days", "31-61 days",
-        "61-90 days", "90-180 days", ">180 days"
-    ]
+    "Not Due", "0-30 Days", "31-60 days", "61-90 days"
+]
 
     customer_aging = [
         {"bucket": b, "amount": round(sum(c.amount for c in customers if c.agingDays == b), 2)}
         for b in aging_buckets
     ]
     supplier_aging = [
-        {"bucket": b, "amount": round(sum(s.amount for s in suppliers if s.agingDays == b), 2)}
-        for b in aging_buckets
-    ]
+    {"bucket": b, "amount": round(sum(
+        s.amount for s in suppliers if (s.agingDays or "Not Due") == b
+    ), 2)}
+    for b in aging_buckets
+]
 
     # ── Top unpaid ────────────────────────────────────────────────────────
     def top_clients(clients, n):
@@ -823,9 +824,9 @@ def get_dso_dpo_dashboard(
         for b in aging_buckets
     ]
     supplier_delay_dist = [
-        {"bucket": b, "count": sum(1 for s in suppliers if s.agingDays == b)}
-        for b in aging_buckets
-    ]
+    {"bucket": b, "count": sum(1 for s in suppliers if (s.agingDays or "Not Due") == b)}
+    for b in aging_buckets
+]
 
     # ── Overdue totals ────────────────────────────────────────────────────
     total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not due"), 2)
