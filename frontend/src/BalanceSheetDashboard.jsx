@@ -8,7 +8,6 @@ import {
 
 const API_URL = "http://127.0.0.1:8000";
 
-// ── TUI Brand Palette ────────────────────────────────────────────────────────
 const COLORS = {
   navy:        "#001F5B",
   blue:        "#1B5EA6",
@@ -46,12 +45,10 @@ const fmtK    = (n) => {
   return n.toFixed(0);
 };
 
-// ── Shared label styles ───────────────────────────────────────────────────────
-const lbTop     = { fontSize:8, fill:COLORS.navy,   fontWeight:600 };
-const lbTopGrey = { fontSize:8, fill:COLORS.grey,   fontWeight:500 };
-const lbRight   = { fontSize:8, fill:COLORS.navy,   fontWeight:600 };
+const lbTop     = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
+const lbTopGrey = { fontSize:8, fill:COLORS.grey,  fontWeight:500 };
+const lbRight   = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
 
-// ── Custom XAxis tick: wraps long labels, no tilt ────────────────────────────
 const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
   const words = String(payload.value).split(" ");
   const lines = [];
@@ -88,13 +85,10 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
 };
 
 if (!document.getElementById("bs-print-style")) {
-  const s = document.createElement("style");
-  s.id = "bs-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #bs-print,#bs-print *{visibility:visible} #bs-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} }`;
-  document.head.appendChild(s);
-}
+  const s = document.createElement("style"); s.id = "bs-print-style";
+s.textContent = `@media print { body *{visibility:hidden} #bs-print,#bs-print *{visibility:visible} #bs-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+document.head.appendChild(s);}
 
-// ── KPI bar sub-component ─────────────────────────────────────────────────────
 function KpiBar({ value, prevValue, unit = "", up, formatter, maxVal = 100 }) {
   const display     = formatter ? formatter(value)     : value.toFixed(1);
   const prevDisplay = formatter ? formatter(prevValue) : prevValue.toFixed(1);
@@ -120,7 +114,6 @@ function KpiBar({ value, prevValue, unit = "", up, formatter, maxVal = 100 }) {
   );
 }
 
-// ── Horizontal bar card ───────────────────────────────────────────────────────
 function HBarCard({ title, subtitle, data, height = 280 }) {
   if (!data?.length) return (
     <div style={S.chartCard}>
@@ -153,7 +146,6 @@ function HBarCard({ title, subtitle, data, height = 280 }) {
   );
 }
 
-// ── Balance Sheet Totals Chart ─────────────────────────────────────────────────
 function BalanceSheetTotalsChart({ charts }) {
   const assetsData = [
     { label:"Total Assets",       current: charts?.totalAssets?.[0]?.current       ?? 0, previous: charts?.totalAssets?.[0]?.previous       ?? 0 },
@@ -174,8 +166,6 @@ function BalanceSheetTotalsChart({ charts }) {
         <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
-
-        {/* Assets */}
         <div>
           <p style={{ fontSize:11, fontWeight:700, color:COLORS.blue, margin:"0 0 8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Assets</p>
           <ResponsiveContainer width="100%" height={300}>
@@ -192,8 +182,6 @@ function BalanceSheetTotalsChart({ charts }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Equity & Liabilities */}
         <div>
           <p style={{ fontSize:11, fontWeight:700, color:COLORS.purple, margin:"0 0 8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Equity &amp; Liabilities</p>
           <ResponsiveContainer width="100%" height={300}>
@@ -210,13 +198,11 @@ function BalanceSheetTotalsChart({ charts }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
       </div>
     </div>
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
 export default function BalanceSheetDashboard() {
   const navigate    = useNavigate();
   const currentYear = new Date().getFullYear();
@@ -226,9 +212,10 @@ export default function BalanceSheetDashboard() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-
   const [avlYear, setAvlYear] = useState(currentYear);
   const [avlData, setAvlData] = useState(null);
+
+  const exportPDF = () => window.print();
 
   useEffect(() => { fetchData(); }, [year, period]);
 
@@ -236,10 +223,8 @@ export default function BalanceSheetDashboard() {
     const fetchAvl = async () => {
       try {
         const token = localStorage.getItem("token") || localStorage.getItem("access_token");
-        const res = await fetch(
-          `${API_URL}/dashboard/balance-sheet?year=${avlYear}&period=${period}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await fetch(`${API_URL}/dashboard/balance-sheet?year=${avlYear}&period=${period}`,
+          { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
           const d = await res.json();
           setAvlData(d.charts?.assetsVsLiabilities ?? []);
@@ -253,10 +238,8 @@ export default function BalanceSheetDashboard() {
     setLoading(true); setError("");
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("access_token");
-      const res = await fetch(
-        `${API_URL}/dashboard/balance-sheet?year=${year}&period=${period}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${API_URL}/dashboard/balance-sheet?year=${year}&period=${period}`,
+        { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) { setError("Failed to load balance sheet data."); return; }
       const d = await res.json();
       setData(d);
@@ -300,11 +283,14 @@ export default function BalanceSheetDashboard() {
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Balance Sheet Overview</h1>
-        <img src="/Tui_logo.png" alt="TUI" style={S.logo}/>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <button style={S.exportBtn} onClick={exportPDF}>↓ PDF</button>
+          <img src="/Tui_logo.png" alt="TUI" style={S.logo}/>
+        </div>
       </div>
 
       {/* Controls */}
-      <div style={S.controlBar}>
+      <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
             <button key={y} style={year === y ? S.yearTabActive : S.yearTab} onClick={() => setYear(y)}>{y}</button>
@@ -400,13 +386,11 @@ export default function BalanceSheetDashboard() {
       {/* Section 2: Pies */}
       <div style={S.section}><p style={S.sectionHeading}>Financial Structure Analysis</p></div>
       <div style={S.row2}>
-
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Asset Structure</p>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={assetPieData} cx="50%" cy="50%" outerRadius={100}
-                dataKey="value" labelLine={false} label={renderPieLabel}>
+              <Pie data={assetPieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" labelLine={false} label={renderPieLabel}>
                 {assetPieData.map((_, i) => <Cell key={i} fill={PIE_ASSET_COLORS[i % PIE_ASSET_COLORS.length]}/>)}
               </Pie>
               <Tooltip formatter={(v) => fmtFull(v)}/>
@@ -426,8 +410,7 @@ export default function BalanceSheetDashboard() {
           <p style={S.chartTitle}>Liability Structure</p>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={liabilityPieData} cx="50%" cy="50%" outerRadius={100}
-                dataKey="value" labelLine={false} label={renderPieLabel}>
+              <Pie data={liabilityPieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" labelLine={false} label={renderPieLabel}>
                 {liabilityPieData.map((_, i) => <Cell key={i} fill={PIE_LIABILITY_COLORS[i % PIE_LIABILITY_COLORS.length]}/>)}
               </Pie>
               <Tooltip formatter={(v) => fmtFull(v)}/>
@@ -442,10 +425,9 @@ export default function BalanceSheetDashboard() {
             ))}
           </div>
         </div>
-
       </div>
 
-      {/* Assets vs Liabilities — with per-chart year slicer */}
+      {/* Assets vs Liabilities */}
       <div style={{ padding:"0 28px 16px" }}>
         <div style={S.chartCard}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
@@ -499,6 +481,7 @@ const S = {
   backBtn:       { background:"none", border:"none", fontSize:22, cursor:"pointer", color:COLORS.navy, marginRight:16, padding:"4px 8px", borderRadius:8 },
   pageTitle:     { flex:1, textAlign:"center", color:COLORS.navy, fontSize:22, fontWeight:800, margin:0 },
   logo:          { height:32, marginLeft:12 },
+  exportBtn:     { padding:"6px 14px", borderRadius:8, border:`1px solid ${COLORS.navy}`, background:COLORS.navy, color:"white", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"Arial,sans-serif" },
   controlBar:    { display:"flex", alignItems:"center", flexWrap:"wrap", padding:"10px 28px", gap:12, background:"white", borderBottom:"1px solid #E5E7EB" },
   yearTabs:      { display:"flex", gap:4 },
   yearTab:       { padding:"6px 18px", borderRadius:6, border:"1px solid #CBD5E1", background:"white", cursor:"pointer", fontSize:13, fontFamily:"Arial,sans-serif", color:"#374151" },
