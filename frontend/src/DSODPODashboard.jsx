@@ -19,24 +19,15 @@ const C = {
   teal:    "#0D9488",
 };
 
-const AGING_COLORS = [
-  "#16A34A", "#1A6FBF", "#D97706",
-  "#7C3AED", "#D40E14", "#6B7280",
-];
+const AGING_COLORS = ["#16A34A","#1A6FBF","#D97706","#7C3AED","#D40E14","#6B7280"];
 
 const FISCAL_PERIODS = [
-  { period: "P1",  month: "October"   },
-  { period: "P2",  month: "November"  },
-  { period: "P3",  month: "December"  },
-  { period: "P4",  month: "January"   },
-  { period: "P5",  month: "February"  },
-  { period: "P6",  month: "March"     },
-  { period: "P7",  month: "April"     },
-  { period: "P8",  month: "May"       },
-  { period: "P9",  month: "June"      },
-  { period: "P10", month: "July"      },
-  { period: "P11", month: "August"    },
-  { period: "P12", month: "September" },
+  { period: "P1",  month: "October"   }, { period: "P2",  month: "November"  },
+  { period: "P3",  month: "December"  }, { period: "P4",  month: "January"   },
+  { period: "P5",  month: "February"  }, { period: "P6",  month: "March"     },
+  { period: "P7",  month: "April"     }, { period: "P8",  month: "May"       },
+  { period: "P9",  month: "June"      }, { period: "P10", month: "July"      },
+  { period: "P11", month: "August"    }, { period: "P12", month: "September" },
 ];
 
 const fmt     = (n) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -59,35 +50,34 @@ const CustomTooltip = ({ active, payload, label }) => {
 const GaugeChart = ({ value, max, color, label }) => {
   const pct      = Math.min(value / max, 1);
   const angle    = pct * 180;
-  const r        = 70;
-  const cx       = 90;
-  const cy       = 90;
+  const r        = 70, cx = 90, cy = 90;
   const toRad    = (deg) => (deg * Math.PI) / 180;
-  const startX   = cx - r;
-  const startY   = cy;
+  const startX   = cx - r, startY = cy;
   const endAngle = 180 - angle;
   const endX     = cx + r * Math.cos(toRad(endAngle));
   const endY     = cy - r * Math.sin(toRad(endAngle));
   const largeArc = angle > 90 ? 1 : 0;
-
   return (
     <div style={{ textAlign: "center" }}>
       <p style={{ color: C.navy, fontWeight: 700, fontSize: 13, margin: "0 0 4px" }}>{label}</p>
       <svg width="180" height="100" viewBox="0 0 180 100">
-        <path d={`M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-          fill="none" stroke="#E5E7EB" strokeWidth="16" strokeLinecap="round" />
+        <path d={`M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#E5E7EB" strokeWidth="16" strokeLinecap="round" />
         {value > 0 && (
-          <path d={`M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`}
-            fill="none" stroke={color} strokeWidth="16" strokeLinecap="round" />
+          <path d={`M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`} fill="none" stroke={color} strokeWidth="16" strokeLinecap="round" />
         )}
-        <text x="18"     y="98" fontSize="10" fill={C.grey}>0</text>
+        <text x="18"      y="98" fontSize="10" fill={C.grey}>0</text>
         <text x={cx - 10} y="20" fontSize="10" fill={C.grey}>{Math.round(max / 2)}</text>
-        <text x="148"    y="98" fontSize="10" fill={C.grey}>{max}</text>
+        <text x="148"     y="98" fontSize="10" fill={C.grey}>{max}</text>
         <text x={cx} y={cy + 10} textAnchor="middle" fontSize="28" fontWeight="800" fill={color}>{value}</text>
       </svg>
     </div>
   );
 };
+
+if (!document.getElementById("dso-print-style")) {
+  const s = document.createElement("style"); s.id = "dso-print-style";
+s.textContent = `@media print { body *{visibility:hidden} #dso-print,#dso-print *{visibility:visible} #dso-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+document.head.appendChild(s);}
 
 export default function DSODPODashboard() {
   const navigate    = useNavigate();
@@ -98,6 +88,8 @@ export default function DSODPODashboard() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
+
+  const exportPDF = () => window.print();
 
   useEffect(() => { fetchData(); }, [year, period]);
 
@@ -111,55 +103,44 @@ export default function DSODPODashboard() {
       );
       if (!res.ok) { setError("Failed to load data."); return; }
       setData(await res.json());
-    } catch {
-      setError("Network error.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Network error."); }
+    finally { setLoading(false); }
   };
 
   if (loading) return (
-    <div style={S.page}>
-      <div style={S.loadingBox}>
-        <div style={S.spinner} />
-        <p style={{ color: C.navy, marginTop: 16, fontWeight: 600 }}>Loading DSO & DPO Dashboard...</p>
-      </div>
-    </div>
+    <div style={S.page}><div style={S.loadingBox}><div style={S.spinner}/>
+      <p style={{ color: C.navy, marginTop: 16, fontWeight: 600 }}>Loading DSO &amp; DPO Dashboard...</p>
+    </div></div>
   );
-  if (error) return (
-    <div style={S.page}>
-      <p style={{ color: C.red, textAlign: "center", marginTop: 100 }}>{error}</p>
-    </div>
-  );
+  if (error) return <div style={S.page}><p style={{ color: C.red, textAlign: "center", marginTop: 100 }}>{error}</p></div>;
   if (!data) return null;
 
   const { kpis, customerAging, supplierAging, topCustomers, topSuppliers, customerDelayDist, supplierDelayDist } = data;
+
   const filteredCustomerAging = customerAging.filter(d => d.amount > 0);
-const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
+  const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
 
   const dso = kpis.dso?.current ?? 0;
   const dpo = kpis.dpo?.current ?? 0;
 
-  const customerPieData = customerAging
-    .filter(d => d.amount > 0)
-    .map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
-
-  const supplierPieData = supplierAging
-    .filter(d => d.amount > 0)
-    .map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
+  const customerPieData = filteredCustomerAging.map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
+  const supplierPieData = filteredSupplierAging.map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
 
   return (
-    <div style={S.page}>
+    <div style={S.page} id="dso-print">
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
-        <h1 style={S.pageTitle}>DSO & DPO</h1>
-        <img src="/Tui_logo.png" alt="TUI" style={S.logo} onError={e => e.target.style.display = "none"} />
+        <h1 style={S.pageTitle}>DSO &amp; DPO</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button style={S.exportBtn} onClick={exportPDF}>↓ PDF</button>
+          <img src="/Tui_logo.png" alt="TUI" style={S.logo} onError={e => e.target.style.display = "none"} />
+        </div>
       </div>
 
-      {/* ── Controls ─────────────────────────────────────────────────────── */}
-      <div style={S.controlBar}>
+      {/* Controls */}
+      <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
             <button key={y} style={year === y ? S.yearTabActive : S.yearTab} onClick={() => setYear(y)}>{y}</button>
@@ -169,25 +150,20 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
           <span style={S.periodLabel}>Period:</span>
           <div style={S.periodTabs}>
             {FISCAL_PERIODS.map(({ period: p, month }) => (
-              <button key={p}
-                style={period === p ? S.periodTabActive : S.periodTab}
-                onClick={() => setPeriod(p)}
-                title={month}>{p}
-              </button>
+              <button key={p} style={period === p ? S.periodTabActive : S.periodTab} onClick={() => setPeriod(p)} title={month}>{p}</button>
             ))}
           </div>
         </div>
         <span style={S.currencyLabel}>Actual Values in EUR</span>
       </div>
 
-      {/* ── DSO / DPO Header with gauges ──────────────────────────────────── */}
+      {/* DSO / DPO section */}
       <div style={S.dsoSection}>
 
         {/* DSO side */}
         <div style={S.dsoBlock}>
           <div style={S.dsoHeader}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy}
-                 strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6v2M12 16v2M8.5 9a3.5 3.5 0 0 1 7 0c0 2-3.5 3-3.5 3s-3.5 1-3.5 3a3.5 3.5 0 0 0 7 0"/>
             </svg>
@@ -201,20 +177,15 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
                   <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]}
-                    label={{ position: "top", fontSize: 8, formatter: fmt }}>
-                    {filteredCustomerAging.map((_, i) => (
-  <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
-))}
+                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 8, formatter: fmt }}>
+                    {filteredCustomerAging.map((_, i) => <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div style={S.miniCard}>
               <GaugeChart value={Math.round(dso)} max={Math.max(Math.round(dso) * 2, 88)} color={C.navy} label="DSO" />
-              <p style={{ textAlign: "center", fontSize: 11, color: C.grey, margin: "4px 0 0" }}>
-                Prev: {kpis.dso?.previous ?? 0} days
-              </p>
+              <p style={{ textAlign: "center", fontSize: 11, color: C.grey, margin: "4px 0 0" }}>Prev: {kpis.dso?.previous ?? 0} days</p>
             </div>
           </div>
         </div>
@@ -224,8 +195,7 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
         {/* DPO side */}
         <div style={S.dsoBlock}>
           <div style={S.dsoHeader}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy}
-                 strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6v2M12 16v2M8.5 9a3.5 3.5 0 0 1 7 0c0 2-3.5 3-3.5 3s-3.5 1-3.5 3a3.5 3.5 0 0 0 7 0"/>
             </svg>
@@ -235,30 +205,25 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
             <div style={S.miniCard}>
               <p style={S.miniTitle}>Supplier Aging Overdue</p>
               <ResponsiveContainer width={220} height={160}>
-                <BarChart data={supplierAging.filter(d => d.amount > 0)} margin={{ top: 16 }}>
+                <BarChart data={filteredSupplierAging} margin={{ top: 16 }}>
                   <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]}
-                    label={{ position: "top", fontSize: 8, formatter: fmt }}>
-                    {supplierAging.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
-                    ))}
+                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 8, formatter: fmt }}>
+                    {filteredSupplierAging.map((_, i) => <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div style={S.miniCard}>
               <GaugeChart value={Math.round(dpo)} max={Math.max(Math.round(dpo) * 2, 1000)} color={C.red} label="DPO" />
-              <p style={{ textAlign: "center", fontSize: 11, color: C.grey, margin: "4px 0 0" }}>
-                Prev: {kpis.dpo?.previous ?? 0} days
-              </p>
+              <p style={{ textAlign: "center", fontSize: 11, color: C.grey, margin: "4px 0 0" }}>Prev: {kpis.dpo?.previous ?? 0} days</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Row 1: Top Unpaid Customer + Top Unpaid Supplier ─────────────── */}
+      {/* Top Unpaid */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Top Unpaid Customers</p>
@@ -268,12 +233,10 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
               <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="amount" name="Amount" fill={C.navy} radius={[3, 3, 0, 0]}
-                label={{ position: "top", fontSize: 8, formatter: fmt }} />
+              <Bar dataKey="amount" name="Amount" fill={C.navy} radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 8, formatter: fmt }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Top 5 Unpaid Suppliers</p>
           <ResponsiveContainer width="100%" height={220}>
@@ -282,14 +245,13 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
               <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="amount" name="Amount" fill={C.blue} radius={[3, 3, 0, 0]}
-                label={{ position: "top", fontSize: 8, formatter: fmt }} />
+              <Bar dataKey="amount" name="Amount" fill={C.blue} radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 8, formatter: fmt }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* ── Row 2: Payment Delay Distribution ────────────────────────────── */}
+      {/* Delay Distribution */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Customer Payment Delay Distribution</p>
@@ -300,16 +262,12 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
               <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Customers" radius={[3, 3, 0, 0]}
-                label={{ position: "top", fontSize: 10 }}>
-                {customerDelayDist.map((_, i) => (
-                  <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />
-                ))}
+              <Bar dataKey="count" name="Customers" radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 10 }}>
+                {customerDelayDist.map((_, i) => <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Supplier Payment Delay Distribution</p>
           <p style={S.chartSub}>Number of suppliers per delay range</p>
@@ -319,18 +277,15 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
               <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Suppliers" radius={[3, 3, 0, 0]}
-                label={{ position: "top", fontSize: 10 }}>
-                {supplierDelayDist.map((_, i) => (
-                  <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />
-                ))}
+              <Bar dataKey="count" name="Suppliers" radius={[3, 3, 0, 0]} label={{ position: "top", fontSize: 10 }}>
+                {supplierDelayDist.map((_, i) => <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* ── Row 3: Aging Pie Charts ───────────────────────────────────────── */}
+      {/* Aging Pies */}
       <div style={{ ...S.row2, marginBottom: 32 }}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Customer Aging Distribution</p>
@@ -340,13 +295,9 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={customerPieData} dataKey="value" nameKey="name"
-                  cx="50%" cy="50%" outerRadius={90}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                  labelLine={false} fontSize={10}>
-                  {customerPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                <Pie data={customerPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                  {customerPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtFull(v)} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -354,7 +305,6 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
             </ResponsiveContainer>
           )}
         </div>
-
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Supplier Aging Distribution</p>
           <p style={S.chartSub}>Monitor supplier payment delays across aging buckets</p>
@@ -363,13 +313,9 @@ const filteredSupplierAging = supplierAging.filter(d => d.amount > 0);
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={supplierPieData} dataKey="value" nameKey="name"
-                  cx="50%" cy="50%" outerRadius={90}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                  labelLine={false} fontSize={10}>
-                  {supplierPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                <Pie data={supplierPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                  {supplierPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtFull(v)} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -388,7 +334,8 @@ const S = {
   topBar:      { background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", padding: "14px 28px", borderBottom: "1px solid #D6E8F7", position: "sticky", top: 0, zIndex: 10, boxShadow: "0 2px 12px rgba(9,42,94,0.07)" },
   backBtn:     { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.navy, marginRight: 16, padding: "4px 8px", borderRadius: 8 },
   pageTitle:   { flex: 1, textAlign: "center", color: C.navy, fontSize: 22, fontWeight: 800, margin: 0 },
-  logo:        { height: 32 },
+  logo:        { height: 32, marginLeft: 12 },
+  exportBtn:   { padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.navy}`, background: C.navy, color: "white", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "Arial, sans-serif" },
   controlBar:  { display: "flex", alignItems: "center", flexWrap: "wrap", padding: "10px 28px", gap: 12, background: "white", borderBottom: "1px solid #E5E7EB" },
   yearTabs:    { display: "flex", gap: 4 },
   yearTab:         { padding: "6px 18px", borderRadius: 6, border: "1px solid #CBD5E1", background: "white", cursor: "pointer", fontSize: 13, fontFamily: "Arial, sans-serif", color: "#374151" },

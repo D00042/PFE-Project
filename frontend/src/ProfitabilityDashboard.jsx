@@ -83,22 +83,13 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
   );
 };
 
-const exportCSV = (rows, filename) => {
-  if (!rows?.length) return;
-  const headers = Object.keys(rows[0]).join(",");
-  const body    = rows.map(r => Object.values(r).map(v => `"${v}"`).join(",")).join("\n");
-  const blob    = new Blob([headers + "\n" + body], { type:"text/csv" });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement("a");
-  a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
-};
+
 const exportPDF = () => window.print();
 
 if (!document.getElementById("prof-print-style")) {
   const s = document.createElement("style");
   s.id = "prof-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #prof-print,#prof-print *{visibility:visible} #prof-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} }`;
-  document.head.appendChild(s);
+s.textContent = `@media print { body *{visibility:hidden} #prof-print,#prof-print *{visibility:visible} #prof-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;  document.head.appendChild(s);
 }
 
 export default function ProfitabilityDashboard() {
@@ -191,7 +182,6 @@ export default function ProfitabilityDashboard() {
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Profitability Dashboard</h1>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <button style={S.exportBtn} onClick={() => exportCSV(monthlyTrend, `profitability_${year}_${period}.csv`)}>↓ CSV</button>
           <button style={{ ...S.exportBtn, background:COLORS.navy, color:"white", borderColor:COLORS.navy }} onClick={exportPDF}>↓ PDF</button>
           <img src="/Tui_logo.png" alt="TUI" style={S.logo}/>
         </div>
@@ -397,7 +387,7 @@ export default function ProfitabilityDashboard() {
               Monthly Revenue, EBIT &amp; Expense Trend
               {period !== "P12" && <span style={{ fontSize:11, fontWeight:400, color:COLORS.grey, marginLeft:8 }}>(P1 – {period})</span>}
             </p>
-            <button style={S.miniBtn} onClick={() => exportCSV(monthlyTrend, `trend_${year}_${period}.csv`)}>↓ CSV</button>
+           
           </div>
           <div style={S.legendRow}>
             <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Revenue</span>

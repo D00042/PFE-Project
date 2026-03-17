@@ -116,7 +116,7 @@ function Accueil() {
           <p style={S.heroSub}>Welcome to the TUI Financial Intelligence Platform. Select a module below to get started.</p>
         </div>
       </div>
-+
+
       {/* Body */}
       <div style={S.body}>
 
