@@ -15,6 +15,8 @@ import DashboardLayout from './DashboardLayout'
 // Dashboard pages
 import ProfitabilityDashboard from './ProfitabilityDashboard'
 import BalanceSheetDashboard  from './BalanceSheetDashboard'
+import LiquidityDashboard from './LiquidityDashboard'
+import DSODPODashboard from './DSODPODashboard'
 // import CashFlowDashboard   from './CashFlowDashboard'   ← add future ones here
 
 function App() {
@@ -37,12 +39,16 @@ function App() {
         <Route path="/home/dashboard" element={<DashboardLayout />}>
           <Route path="profitability" element={<ProfitabilityDashboard />} />
           <Route path="balance-sheet" element={<BalanceSheetDashboard />} />
+          <Route path="liquidity"     element={<LiquidityDashboard />} />
+          <Route path="dso-dpo" element={<DSODPODashboard />} />
           <Route index element={<Navigate to="profitability" replace />} />
         </Route>
 
         {/* ── Fallbacks ─────────────────────────────────────────────── */}
         <Route path="/"  element={<Navigate to="/login" replace />} />
         <Route path="*"  element={<Navigate to="/login" replace />} />
+
+     
 
       </Routes>
     </BrowserRouter>
