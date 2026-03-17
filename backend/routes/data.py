@@ -709,83 +709,83 @@ def get_dso_dpo_dashboard(
 ):
     from sqlalchemy import func
 
-    # Active months up to selected period
-    idx            = PERIOD_TO_IDX_DSO.get(period, 11)
-    active_months  = FISCAL_MONTHS_DSO[:idx + 1]
-    prev_year      = year - 1
+    idx           = PERIOD_TO_IDX_DSO.get(period, 11)
+    active_months = FISCAL_MONTHS_DSO[:idx + 1]
+    prev_year     = year - 1
+    prev2_year    = year - 2
 
-    # ── Fetch clients ─────────────────────────────────────────────────────
-    customers = db.query(Client).filter(
-        Client.year == year,
-        Client.clientType.in_(["customer", "Customer"])
-    ).all()
+    def get_clients(yr, ctype):
+        return db.query(Client).filter(
+            Client.year == yr,
+            Client.clientType.in_([ctype, ctype.capitalize()])
+        ).all()
 
-    suppliers = db.query(Client).filter(
-        Client.year == year,
-        Client.clientType.in_(["supplier", "Supplier"])
-    ).all()
+    customers_curr  = get_clients(year,       "customer")
+    customers_prev  = get_clients(prev_year,  "customer")
+    customers_prev2 = get_clients(prev2_year, "customer")
+    suppliers_curr  = get_clients(year,       "supplier")
+    suppliers_prev  = get_clients(prev_year,  "supplier")
+    suppliers_prev2 = get_clients(prev2_year, "supplier")
 
-    # ── Revenue filtered by active months ─────────────────────────────────
-    revenue = db.query(func.sum(RevenueExpense.value)).filter(
-        RevenueExpense.year == year,
-        RevenueExpense.label == "Revenue",
-        RevenueExpense.month.in_(active_months)
-    ).scalar() or 0
+    def get_revenue(yr):
+        return db.query(func.sum(RevenueExpense.value)).filter(
+            RevenueExpense.year == yr,
+            RevenueExpense.label == "Revenue",
+            RevenueExpense.month.in_(active_months)
+        ).scalar() or 0
 
-    prev_revenue = db.query(func.sum(RevenueExpense.value)).filter(
-        RevenueExpense.year == prev_year,
-        RevenueExpense.label == "Revenue",
-        RevenueExpense.month.in_(active_months)
-    ).scalar() or 0
+    revenue      = get_revenue(year)
+    prev_revenue = get_revenue(prev_year)
 
-    # ── Trade Receivables & Payables ──────────────────────────────────────
-    trade_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Current trade and other receivables"
-    ).scalar() or 0
+    def get_al(yr, label):
+        return db.query(func.sum(AssetLiability.value)).filter(
+            AssetLiability.year == yr,
+            AssetLiability.month.in_(active_months),
+            AssetLiability.label == label
+        ).scalar() or 0
 
-    trade_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Trade payables"
-    ).scalar() or 0
+    trade_recv = get_al(year,      "Current trade and other receivables")
+    trade_pay  = get_al(year,      "Trade payables")
+    prev_recv  = get_al(prev_year, "Current trade and other receivables")
+    prev_pay   = get_al(prev_year, "Trade payables")
 
-    prev_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Current trade and other receivables"
-    ).scalar() or 0
-
-    prev_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Trade payables"
-    ).scalar() or 0
-
-    # ── DSO / DPO ─────────────────────────────────────────────────────────
-    days = len(active_months) * 30
-    dso      = round((trade_recv / revenue) * days, 1) if revenue else 0
-    dpo      = round((trade_pay  / revenue) * days, 1) if revenue else 0
+    days     = len(active_months) * 30
+    dso      = round((trade_recv / revenue)      * days, 1) if revenue      else 0
+    dpo      = round((trade_pay  / revenue)      * days, 1) if revenue      else 0
     prev_dso = round((prev_recv  / prev_revenue) * days, 1) if prev_revenue else 0
     prev_dpo = round((prev_pay   / prev_revenue) * days, 1) if prev_revenue else 0
 
-    # ── Aging buckets ─────────────────────────────────────────────────────
     aging_buckets = [
         "Not due", "0-30 days", "31-61 days",
         "61-90 days", "90-180 days", ">180 days"
     ]
 
+    # Customer aging — current year only (single bars per bucket)
     customer_aging = [
-        {"bucket": b, "amount": round(sum(c.amount for c in customers if c.agingDays == b), 2)}
-        for b in aging_buckets
-    ]
-    supplier_aging = [
-        {"bucket": b, "amount": round(sum(s.amount for s in suppliers if s.agingDays == b), 2)}
+        {"bucket": b, "amount": round(sum(c.amount for c in customers_curr if c.agingDays == b), 2)}
         for b in aging_buckets
     ]
 
-    # ── Top unpaid ────────────────────────────────────────────────────────
+    # Supplier aging — 3 years grouped by bucket
+    supplier_aging_by_year = []
+    for bucket in aging_buckets:
+        curr  = sum(s.amount for s in suppliers_curr  if s.agingDays == bucket)
+        prev  = sum(s.amount for s in suppliers_prev  if s.agingDays == bucket)
+        prev2 = sum(s.amount for s in suppliers_prev2 if s.agingDays == bucket)
+        if curr > 0 or prev > 0 or prev2 > 0:
+            supplier_aging_by_year.append({
+                "bucket":        bucket,
+                str(year):       round(curr,  2),
+                str(prev_year):  round(prev,  2),
+                str(prev2_year): round(prev2, 2),
+            })
+
+    # Supplier aging pie (current year)
+    supplier_aging = [
+        {"bucket": b, "amount": round(sum(s.amount for s in suppliers_curr if s.agingDays == b), 2)}
+        for b in aging_buckets
+    ]
+
     def top_clients(clients, n):
         totals = {}
         for c in clients:
@@ -795,22 +795,20 @@ def get_dso_dpo_dashboard(
             key=lambda x: x["amount"], reverse=True
         )[:n]
 
-    top_customers = top_clients(customers, 10)
-    top_suppliers = top_clients(suppliers, 5)
+    top_customers = top_clients(customers_curr, 10)
+    top_suppliers = top_clients(suppliers_curr, 5)
 
-    # ── Delay distribution histogram ──────────────────────────────────────
     customer_delay_dist = [
-        {"bucket": b, "count": sum(1 for c in customers if c.agingDays == b)}
+        {"bucket": b, "count": sum(1 for c in customers_curr if c.agingDays == b)}
         for b in aging_buckets
     ]
     supplier_delay_dist = [
-        {"bucket": b, "count": sum(1 for s in suppliers if s.agingDays == b)}
+        {"bucket": b, "count": sum(1 for s in suppliers_curr if s.agingDays == b)}
         for b in aging_buckets
     ]
 
-    # ── Overdue totals ────────────────────────────────────────────────────
-    total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not due"), 2)
-    total_supplier_overdue = round(sum(s.amount for s in suppliers if s.agingDays != "Not due"), 2)
+    total_customer_overdue = round(sum(c.amount for c in customers_curr if c.agingDays != "Not due"), 2)
+    total_supplier_overdue = round(sum(s.amount for s in suppliers_curr if s.agingDays != "Not due"), 2)
 
     return {
         "kpis": {
@@ -819,10 +817,16 @@ def get_dso_dpo_dashboard(
             "customerOverdue": {"current": total_customer_overdue, "previous": 0},
             "supplierOverdue": {"current": total_supplier_overdue, "previous": 0},
         },
-        "customerAging":     customer_aging,
-        "supplierAging":     supplier_aging,
-        "topCustomers":      top_customers,
-        "topSuppliers":      top_suppliers,
-        "customerDelayDist": customer_delay_dist,
-        "supplierDelayDist": supplier_delay_dist,
+        "customerAging":        customer_aging,
+        "supplierAging":        supplier_aging,
+        "supplierAgingByYear":  supplier_aging_by_year,
+        "topCustomers":         top_customers,
+        "topSuppliers":         top_suppliers,
+        "customerDelayDist":    customer_delay_dist,
+        "supplierDelayDist":    supplier_delay_dist,
+        "years": {
+            "current": year,
+            "prev":    prev_year,
+            "prev2":   prev2_year,
+        },
     }
