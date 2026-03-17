@@ -12,11 +12,11 @@ const C = {
   blue:    "#1A6FBF",
   purple:  "#4C1D7A",
   purpleL: "#9B7EC8",
+  purple2: "#DDD6FE",
   red:     "#D40E14",
   green:   "#16A34A",
   amber:   "#D97706",
   grey:    "#9CA3AF",
-  teal:    "#0D9488",
 };
 
 const AGING_COLORS = [
@@ -80,9 +80,9 @@ const GaugeChart = ({ value, max, color, label }) => {
           <path d={`M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`}
             fill="none" stroke={color} strokeWidth="16" strokeLinecap="round" />
         )}
-        <text x="18"     y="98" fontSize="10" fill={C.grey}>0</text>
+        <text x="18"      y="98" fontSize="10" fill={C.grey}>0</text>
         <text x={cx - 10} y="20" fontSize="10" fill={C.grey}>{Math.round(max / 2)}</text>
-        <text x="148"    y="98" fontSize="10" fill={C.grey}>{max}</text>
+        <text x="148"     y="98" fontSize="10" fill={C.grey}>{max}</text>
         <text x={cx} y={cy + 10} textAnchor="middle" fontSize="28" fontWeight="800" fill={color}>{value}</text>
       </svg>
     </div>
@@ -133,16 +133,28 @@ export default function DSODPODashboard() {
   );
   if (!data) return null;
 
-  const { kpis, customerAging, supplierAging, topCustomers, topSuppliers, customerDelayDist, supplierDelayDist } = data;
+  const {
+    kpis,
+    customerAging,
+    supplierAging,
+    supplierAgingByYear,
+    topCustomers, topSuppliers,
+    customerDelayDist, supplierDelayDist,
+    years,
+  } = data;
+
+  const yr      = years?.current ?? year;
+  const prevYr  = years?.prev    ?? year - 1;
+  const prev2Yr = years?.prev2   ?? year - 2;
 
   const dso = kpis.dso?.current ?? 0;
   const dpo = kpis.dpo?.current ?? 0;
 
-  const customerPieData = customerAging
+  const customerPieData = (customerAging || [])
     .filter(d => d.amount > 0)
     .map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
 
-  const supplierPieData = supplierAging
+  const supplierPieData = (supplierAging || [])
     .filter(d => d.amount > 0)
     .map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
 
@@ -167,21 +179,18 @@ export default function DSODPODashboard() {
           <span style={S.periodLabel}>Period:</span>
           <div style={S.periodTabs}>
             {FISCAL_PERIODS.map(({ period: p, month }) => (
-              <button key={p}
-                style={period === p ? S.periodTabActive : S.periodTab}
-                onClick={() => setPeriod(p)}
-                title={month}>{p}
-              </button>
+              <button key={p} style={period === p ? S.periodTabActive : S.periodTab}
+                onClick={() => setPeriod(p)} title={month}>{p}</button>
             ))}
           </div>
         </div>
         <span style={S.currencyLabel}>Actual Values in EUR</span>
       </div>
 
-      {/* ── DSO / DPO Header with gauges ──────────────────────────────────── */}
+      {/* ── DSO / DPO Section ────────────────────────────────────────────── */}
       <div style={S.dsoSection}>
 
-        {/* DSO side */}
+        {/* ── DSO side — customer aging single bars + gauge ────────────── */}
         <div style={S.dsoBlock}>
           <div style={S.dsoHeader}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy}
@@ -191,22 +200,26 @@ export default function DSODPODashboard() {
             </svg>
             <h2 style={S.dsoTitle}>Days Sales' Outstanding</h2>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={S.dsoRow}>
             <div style={S.miniCard}>
               <p style={S.miniTitle}>Customer Aging Overdue</p>
-              <ResponsiveContainer width={220} height={160}>
-                <BarChart data={customerAging.filter(d => d.amount > 0)} margin={{ top: 16 }}>
-                  <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]}
-                    label={{ position: "top", fontSize: 8, formatter: fmt }}>
-                    {customerAging.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {(customerAging || []).filter(d => d.amount > 0).length === 0 ? (
+                <p style={{ color: C.grey, fontSize: 12, padding: "20px 0" }}>No data</p>
+              ) : (
+                <ResponsiveContainer width={240} height={180}>
+                  <BarChart data={(customerAging || []).filter(d => d.amount > 0)} margin={{ top: 20, bottom: 8 }}>
+                    <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
+                    <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="amount" name="Amount" radius={[3,3,0,0]}
+                      label={{ position: "top", fontSize: 8, formatter: fmt }}>
+                      {(customerAging || []).filter(d => d.amount > 0).map((_, i) => (
+                        <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div style={S.miniCard}>
               <GaugeChart value={Math.round(dso)} max={Math.max(Math.round(dso) * 2, 88)} color={C.navy} label="DSO" />
@@ -219,7 +232,7 @@ export default function DSODPODashboard() {
 
         <div style={S.dsoDivider} />
 
-        {/* DPO side */}
+        {/* ── DPO side — supplier aging 3 years grouped + gauge ────────── */}
         <div style={S.dsoBlock}>
           <div style={S.dsoHeader}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.navy}
@@ -229,22 +242,24 @@ export default function DSODPODashboard() {
             </svg>
             <h2 style={S.dsoTitle}>Days Payables' Outstanding</h2>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={S.dsoRow}>
             <div style={S.miniCard}>
               <p style={S.miniTitle}>Supplier Aging Overdue</p>
-              <ResponsiveContainer width={220} height={160}>
-                <BarChart data={supplierAging.filter(d => d.amount > 0)} margin={{ top: 16 }}>
-                  <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 9 }} tickFormatter={fmt} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="amount" name="Amount" radius={[3, 3, 0, 0]}
-                    label={{ position: "top", fontSize: 8, formatter: fmt }}>
-                    {supplierAging.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? C.purple : C.purpleL} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {(!supplierAgingByYear || supplierAgingByYear.length === 0) ? (
+                <p style={{ color: C.grey, fontSize: 12, padding: "20px 0" }}>No data</p>
+              ) : (
+                <ResponsiveContainer width={260} height={180}>
+                  <BarChart data={supplierAgingByYear} margin={{ top: 20, bottom: 8 }}>
+                    <XAxis dataKey="bucket" tick={{ fontSize: 8 }} />
+                    <YAxis tick={{ fontSize: 8 }} tickFormatter={fmt} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }} />
+                    <Bar dataKey={String(yr)}      name={String(yr)}      fill={C.purple}  radius={[2,2,0,0]} label={{ position: "top", fontSize: 7, formatter: fmt }} />
+                    <Bar dataKey={String(prevYr)}  name={String(prevYr)}  fill={C.purpleL} radius={[2,2,0,0]} />
+                    <Bar dataKey={String(prev2Yr)} name={String(prev2Yr)} fill={C.purple2} radius={[2,2,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div style={S.miniCard}>
               <GaugeChart value={Math.round(dpo)} max={Math.max(Math.round(dpo) * 2, 1000)} color={C.red} label="DPO" />
@@ -256,7 +271,7 @@ export default function DSODPODashboard() {
         </div>
       </div>
 
-      {/* ── Row 1: Top Unpaid Customer + Top Unpaid Supplier ─────────────── */}
+      {/* ── Row 1: Top Unpaid Customers + Top Unpaid Suppliers ───────────── */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Top Unpaid Customers</p>
@@ -266,7 +281,7 @@ export default function DSODPODashboard() {
               <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="amount" name="Amount" fill={C.navy} radius={[3, 3, 0, 0]}
+              <Bar dataKey="amount" name="Amount" fill={C.navy} radius={[3,3,0,0]}
                 label={{ position: "top", fontSize: 8, formatter: fmt }} />
             </BarChart>
           </ResponsiveContainer>
@@ -280,7 +295,7 @@ export default function DSODPODashboard() {
               <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="amount" name="Amount" fill={C.blue} radius={[3, 3, 0, 0]}
+              <Bar dataKey="amount" name="Amount" fill={C.blue} radius={[3,3,0,0]}
                 label={{ position: "top", fontSize: 8, formatter: fmt }} />
             </BarChart>
           </ResponsiveContainer>
@@ -298,9 +313,9 @@ export default function DSODPODashboard() {
               <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Customers" radius={[3, 3, 0, 0]}
+              <Bar dataKey="count" name="Customers" radius={[3,3,0,0]}
                 label={{ position: "top", fontSize: 10 }}>
-                {customerDelayDist.map((_, i) => (
+                {(customerDelayDist || []).map((_, i) => (
                   <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />
                 ))}
               </Bar>
@@ -317,9 +332,9 @@ export default function DSODPODashboard() {
               <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name="Suppliers" radius={[3, 3, 0, 0]}
+              <Bar dataKey="count" name="Suppliers" radius={[3,3,0,0]}
                 label={{ position: "top", fontSize: 10 }}>
-                {supplierDelayDist.map((_, i) => (
+                {(supplierDelayDist || []).map((_, i) => (
                   <Cell key={i} fill={AGING_COLORS[i % AGING_COLORS.length]} />
                 ))}
               </Bar>
@@ -340,11 +355,9 @@ export default function DSODPODashboard() {
               <PieChart>
                 <Pie data={customerPieData} dataKey="value" nameKey="name"
                   cx="50%" cy="50%" outerRadius={90}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   labelLine={false} fontSize={10}>
-                  {customerPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                  {customerPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtFull(v)} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -363,11 +376,9 @@ export default function DSODPODashboard() {
               <PieChart>
                 <Pie data={supplierPieData} dataKey="value" nameKey="name"
                   cx="50%" cy="50%" outerRadius={90}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   labelLine={false} fontSize={10}>
-                  {supplierPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                  {supplierPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtFull(v)} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -397,11 +408,12 @@ const S = {
   periodTab:         { padding: "4px 8px", borderRadius: 5, border: "1px solid #CBD5E1", background: "white", cursor: "pointer", fontSize: 11, fontFamily: "Arial, sans-serif", color: "#374151" },
   periodTabActive:   { padding: "4px 8px", borderRadius: 5, border: "none", background: C.red, cursor: "pointer", fontSize: 11, fontFamily: "Arial, sans-serif", color: "white", fontWeight: 700 },
   currencyLabel:     { marginLeft: "auto", color: C.navy, fontSize: 13, fontWeight: 700 },
-  dsoSection:  { display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 0, padding: "24px 28px", background: "white", margin: "16px 28px", borderRadius: 16, boxShadow: "0 2px 12px rgba(9,42,94,0.08)" },
+  dsoSection:  { display: "grid", gridTemplateColumns: "1fr auto 1fr", padding: "24px 28px", background: "white", margin: "16px 28px", borderRadius: 16, boxShadow: "0 2px 12px rgba(9,42,94,0.08)" },
   dsoBlock:    { padding: "0 16px" },
   dsoDivider:  { width: 1, background: "#E5E7EB", margin: "0 8px" },
   dsoHeader:   { display: "flex", alignItems: "center", gap: 10, marginBottom: 20 },
   dsoTitle:    { color: C.navy, fontSize: 16, fontWeight: 800, margin: 0 },
+  dsoRow:      { display: "flex", justifyContent: "space-around", alignItems: "center", flexWrap: "wrap", gap: 16 },
   miniCard:    { background: "#F8FAFC", borderRadius: 12, padding: "12px 16px", textAlign: "center" },
   miniTitle:   { color: C.navy, fontSize: 12, fontWeight: 700, margin: "0 0 8px" },
   row2:        { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 28px 16px" },
