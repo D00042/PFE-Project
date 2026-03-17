@@ -16,6 +16,7 @@ const authAPI = {
 const TEAMS = ['Record-to-Report', 'Purchase-to-Pay', 'Order-to-Cash'];
 
 export default function UserManagement() {
+  
   const navigate = useNavigate();
   const [users, setUsers]         = useState([]);
   const [loading, setLoading]     = useState(false);

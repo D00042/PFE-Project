@@ -42,6 +42,31 @@ const DASHBOARDS = [
       </svg>
     ),
   },
+
+  {
+  label: "Liquidity",
+  path:  "/home/dashboard/liquidity",
+  icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+         width="20" height="20">
+      <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/>
+      <path d="M12 8v4l3 3"/>
+    </svg>
+  ),
+},
+{
+  label: "DSO & DPO",
+  path:  "/home/dashboard/dso-dpo",
+  icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+         width="20" height="20">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 6v2M12 16v2M8.5 9a3.5 3.5 0 0 1 7 0c0 2-3.5 3-3.5 3s-3.5 1-3.5 3a3.5 3.5 0 0 0 7 0"/>
+    </svg>
+  ),
+},
   // ── Paste future dashboards below this line ────────────────────────────────
   // {
   //   label: "Cash Flow",
