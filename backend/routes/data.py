@@ -243,7 +243,7 @@ def get_profitability_dashboard(
     budget = db.query(RevenueExpense).filter(
         RevenueExpense.year == year,
         RevenueExpense.month.in_(active_months),
-        RevenueExpense.type == "budget"   
+        RevenueExpense.type.ilike("budget")  
     ).all()
  
     def sum_by_label(entries, label):
@@ -551,13 +551,7 @@ WATERFALL_ORDER = [
 ]
 TOTAL_LABELS_LIQ = {"Opening Cash Balance", "Closing Cash Balance"}
 
-CASH_LABEL_AL       = "SB Cash and cash equivalents"
-CURRENT_LIAB_LABELS = [
-    "Trade payables",
-    "Current prepayments received",
-    "Current other liabilities - non-financial instruments",
-    "Current income tax payable",
-]
+
 
 
 def periods_up_to_liq(period: str):
@@ -665,32 +659,39 @@ def get_liquidity_dashboard(
     ]
 
     # ── KPIs ──────────────────────────────────────────────────────────────
-    def get_al_by_label(yr, label):
+    snapshot_period = active_periods[-1]
+
+    def get_cash(yr):
+         return db.query(func.sum(AssetLiability.value)).filter(
+        AssetLiability.year   == yr,
+        AssetLiability.period == snapshot_period,
+        AssetLiability.label  == "SB Cash and cash equivalents"
+    ).scalar() or 0
+   
+
+    def get_current_liab(yr):
         return db.query(func.sum(AssetLiability.value)).filter(
-            AssetLiability.year == yr,
-            AssetLiability.period.in_(active_periods),
-            AssetLiability.label == label
-        ).scalar() or 0
+        AssetLiability.year        == yr,
+        AssetLiability.period      == snapshot_period,
+        AssetLiability.subCategory == "SB Current Provisions And Liabilities"
+    ).scalar() or 0
+    cash_assets      = get_cash(year)
+    prev_cash_assets = get_cash(prev_year)
+    curr_liab        = get_current_liab(year)
+    prev_curr_liab   = get_current_liab(prev_year)
 
-    def get_al_by_labels(yr, labels):
-        return db.query(func.sum(AssetLiability.value)).filter(
-            AssetLiability.year == yr,
-            AssetLiability.period.in_(active_periods),
-            AssetLiability.label.in_(labels)
-        ).scalar() or 0
-
-    cash_assets      = get_al_by_label(year,      CASH_LABEL_AL)
-    prev_cash_assets = get_al_by_label(prev_year, CASH_LABEL_AL)
-    curr_liab        = get_al_by_labels(year,      CURRENT_LIAB_LABELS)
-    prev_curr_liab   = get_al_by_labels(prev_year, CURRENT_LIAB_LABELS)
-
-    cash_ratio      = round(cash_assets / curr_liab,           4) if curr_liab      else 0
+    cash_ratio      = round(cash_assets / curr_liab,      4) if curr_liab      else 0
     prev_cash_ratio = round(prev_cash_assets / prev_curr_liab, 4) if prev_curr_liab else 0
+
+
+    LEASE_LABEL = "Lease & Asset Financing Repayments"
 
     op_total       = sum(r.value for r in cf_curr if r.label == OPERATING_LABEL)
     inv_total      = sum(r.value for r in cf_curr if r.label in INVESTING_LABELS)
+    lease_total    = sum(r.value for r in cf_curr if r.label == LEASE_LABEL)
     prev_op_total  = sum(r.value for r in cf_prev if r.label == OPERATING_LABEL)
     prev_inv_total = sum(r.value for r in cf_prev if r.label in INVESTING_LABELS)
+    prev_lease_total = sum(r.value for r in cf_prev if r.label == LEASE_LABEL)
 
     opening_curr = sum(r.value for r in cf_curr if r.label == OPENING_LABEL)
     closing_curr = sum(r.value for r in cf_curr if r.label == CLOSING_LABEL)
@@ -699,7 +700,7 @@ def get_liquidity_dashboard(
 
     kpis = {
         "cashRatio":    {"current": cash_ratio,                             "previous": prev_cash_ratio},
-        "freeCashFlow": {"current": round(op_total + inv_total, 2),         "previous": round(prev_op_total + prev_inv_total, 2)},
+        "freeCashFlow": {"current":  round(op_total + inv_total + lease_total, 2),     "previous": round(prev_op_total + prev_inv_total + prev_lease_total, 2)},
         "closingCash":  {"current": round(closing_curr, 2),                 "previous": round(closing_prev, 2)},
         "openingCash":  {"current": round(opening_curr, 2),                 "previous": round(opening_prev, 2)},
     }
@@ -758,40 +759,54 @@ def get_dso_dpo_dashboard(
     ).scalar() or 0
 
     # ── Trade Receivables & Payables ──────────────────────────────────────
+    snapshot_month = active_months[-1]
+
     trade_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
+        AssetLiability.year  == year,
+        AssetLiability.month == snapshot_month,        # ← snapshot only
         AssetLiability.label == "Current trade and other receivables"
     ).scalar() or 0
 
     trade_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
+        AssetLiability.year  == year,
+        AssetLiability.month == snapshot_month,        # ← snapshot only
         AssetLiability.label == "Trade payables"
     ).scalar() or 0
 
     prev_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
+        AssetLiability.year  == prev_year,
+        AssetLiability.month == snapshot_month,        # ← snapshot only
         AssetLiability.label == "Current trade and other receivables"
     ).scalar() or 0
 
     prev_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
+        AssetLiability.year  == prev_year,
+        AssetLiability.month == snapshot_month,        # ← snapshot only
         AssetLiability.label == "Trade payables"
+    ).scalar() or 0
+
+    other_overheads = db.query(func.sum(RevenueExpense.value)).filter(
+        RevenueExpense.year == year,
+        RevenueExpense.label == "Other Overheads",
+        RevenueExpense.month.in_(active_months)
+    ).scalar() or 0
+
+    prev_other_overheads = db.query(func.sum(RevenueExpense.value)).filter(
+        RevenueExpense.year == prev_year,
+        RevenueExpense.label == "Other Overheads",
+        RevenueExpense.month.in_(active_months)
     ).scalar() or 0
 
     # ── DSO / DPO ─────────────────────────────────────────────────────────
     days = len(active_months) * 30
-    dso      = round((trade_recv / revenue) * days, 1) if revenue else 0
-    dpo      = round((trade_pay  / revenue) * days, 1) if revenue else 0
-    prev_dso = round((prev_recv  / prev_revenue) * days, 1) if prev_revenue else 0
-    prev_dpo = round((prev_pay   / prev_revenue) * days, 1) if prev_revenue else 0
+    dso      = round((abs(trade_recv) / abs(revenue)) * days, 1) if revenue else 0
+    dpo      = round((abs(trade_pay) / abs(other_overheads)) * days, 1) if other_overheads else 0
+    prev_dso = round((abs(prev_recv) / abs(prev_revenue)) * days, 1) if prev_revenue else 0
+    prev_dpo = round((abs(prev_pay) / abs(prev_revenue)) * days, 1) if prev_revenue else 0
 
     # ── Aging buckets ─────────────────────────────────────────────────────
     aging_buckets = [
-    "Not Due", "0-30 Days", "31-60 days", "61-90 days"
+    "Not Due", "0-30 Days", "31-61 Days", "61-90 Days", "90-180 Days", ">180 Days"
 ]
 
     customer_aging = [
@@ -829,8 +844,8 @@ def get_dso_dpo_dashboard(
 ]
 
     # ── Overdue totals ────────────────────────────────────────────────────
-    total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not due"), 2)
-    total_supplier_overdue = round(sum(s.amount for s in suppliers if s.agingDays != "Not due"), 2)
+    total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not Due"), 2)
+    total_supplier_overdue = round(sum(s.amount for s in suppliers if s.agingDays != "Not Due"), 2)
 
     return {
         "kpis": {
