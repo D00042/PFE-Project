@@ -733,6 +733,7 @@ def get_dso_dpo_dashboard(
     idx            = PERIOD_TO_IDX_DSO.get(period, 11)
     active_months  = FISCAL_MONTHS_DSO[:idx + 1]
     prev_year      = year - 1
+    prev2_year     = year - 2
 
     # ── Fetch clients ─────────────────────────────────────────────────────
     customers = db.query(Client).filter(
@@ -742,6 +743,16 @@ def get_dso_dpo_dashboard(
 
     suppliers = db.query(Client).filter(
         Client.year == year,
+        Client.clientType.in_(["supplier", "Supplier"])
+    ).all()
+
+    suppliers_prev = db.query(Client).filter(
+        Client.year == prev_year,
+        Client.clientType.in_(["supplier", "Supplier"])
+    ).all()
+
+    suppliers_prev2 = db.query(Client).filter(
+        Client.year == prev2_year,
         Client.clientType.in_(["supplier", "Supplier"])
     ).all()
 
@@ -798,29 +809,44 @@ def get_dso_dpo_dashboard(
     ).scalar() or 0
 
     # ── DSO / DPO ─────────────────────────────────────────────────────────
-    days = len(active_months) * 30
-    dso      = round((abs(trade_recv) / abs(revenue)) * days, 1) if revenue else 0
-    dpo      = round((abs(trade_pay) / abs(other_overheads)) * days, 1) if other_overheads else 0
-    prev_dso = round((abs(prev_recv) / abs(prev_revenue)) * days, 1) if prev_revenue else 0
-    prev_dpo = round((abs(prev_pay) / abs(prev_revenue)) * days, 1) if prev_revenue else 0
+    days     = len(active_months) * 30
+    dso      = round((abs(trade_recv) / abs(revenue))              * days, 1) if revenue              else 0
+    dpo      = round((abs(trade_pay)  / abs(other_overheads))      * days, 1) if other_overheads      else 0
+    prev_dso = round((abs(prev_recv)  / abs(prev_revenue))         * days, 1) if prev_revenue         else 0
+    prev_dpo = round((abs(prev_pay)   / abs(prev_other_overheads)) * days, 1) if prev_other_overheads else 0
 
     # ── Aging buckets ─────────────────────────────────────────────────────
     aging_buckets = [
-    "Not Due", "0-30 Days", "31-61 Days", "61-90 Days", "90-180 Days", ">180 Days"
-]
+        "Not Due", "0-30 Days", "31-61 Days",
+        "61-90 Days", "90-180 Days", ">180 Days"
+    ]
 
+    # Customer aging — current year only
     customer_aging = [
         {"bucket": b, "amount": round(sum(c.amount for c in customers if c.agingDays == b), 2)}
         for b in aging_buckets
     ]
-    supplier_aging = [
-    {"bucket": b, "amount": round(sum(
-        s.amount for s in suppliers if (s.agingDays or "Not Due") == b
-    ), 2)}
-    for b in aging_buckets
-]
 
-    # ── Top unpaid ────────────────────────────────────────────────────────
+    # Supplier aging — 3 years grouped
+    supplier_aging_by_year = []
+    for bucket in aging_buckets:
+        curr  = sum(s.amount for s in suppliers       if (s.agingDays or "Not Due") == bucket)
+        prev  = sum(s.amount for s in suppliers_prev  if (s.agingDays or "Not Due") == bucket)
+        prev2 = sum(s.amount for s in suppliers_prev2 if (s.agingDays or "Not Due") == bucket)
+        if curr > 0 or prev > 0 or prev2 > 0:
+            supplier_aging_by_year.append({
+                "bucket":        bucket,
+                str(year):       round(curr,  2),
+                str(prev_year):  round(prev,  2),
+                str(prev2_year): round(prev2, 2),
+            })
+
+    # Supplier aging pie (current year)
+    supplier_aging = [
+        {"bucket": b, "amount": round(sum(s.amount for s in suppliers if (s.agingDays or "Not Due") == b), 2)}
+        for b in aging_buckets
+    ]
+
     def top_clients(clients, n):
         totals = {}
         for c in clients:
@@ -833,19 +859,17 @@ def get_dso_dpo_dashboard(
     top_customers = top_clients(customers, 10)
     top_suppliers = top_clients(suppliers, 5)
 
-    # ── Delay distribution histogram ──────────────────────────────────────
     customer_delay_dist = [
         {"bucket": b, "count": sum(1 for c in customers if c.agingDays == b)}
         for b in aging_buckets
     ]
     supplier_delay_dist = [
-    {"bucket": b, "count": sum(1 for s in suppliers if (s.agingDays or "Not Due") == b)}
-    for b in aging_buckets
-]
+        {"bucket": b, "count": sum(1 for s in suppliers if (s.agingDays or "Not Due") == b)}
+        for b in aging_buckets
+    ]
 
-    # ── Overdue totals ────────────────────────────────────────────────────
     total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not Due"), 2)
-    total_supplier_overdue = round(sum(s.amount for s in suppliers if s.agingDays != "Not Due"), 2)
+    total_supplier_overdue = round(sum(s.amount for s in suppliers if (s.agingDays or "Not Due") != "Not Due"), 2)
 
     return {
         "kpis": {
@@ -854,10 +878,16 @@ def get_dso_dpo_dashboard(
             "customerOverdue": {"current": total_customer_overdue, "previous": 0},
             "supplierOverdue": {"current": total_supplier_overdue, "previous": 0},
         },
-        "customerAging":     customer_aging,
-        "supplierAging":     supplier_aging,
-        "topCustomers":      top_customers,
-        "topSuppliers":      top_suppliers,
-        "customerDelayDist": customer_delay_dist,
-        "supplierDelayDist": supplier_delay_dist,
+        "customerAging":       customer_aging,
+        "supplierAging":       supplier_aging,
+        "supplierAgingByYear": supplier_aging_by_year,
+        "topCustomers":        top_customers,
+        "topSuppliers":        top_suppliers,
+        "customerDelayDist":   customer_delay_dist,
+        "supplierDelayDist":   supplier_delay_dist,
+        "years": {
+            "current": year,
+            "prev":    prev_year,
+            "prev2":   prev2_year,
+        },
     }
