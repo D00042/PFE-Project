@@ -252,52 +252,40 @@ export const dataAPI = {
     return handleResponse(response);
   },
 
-  // SUPPLIERS
-  createSupplier: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/suppliers`, {
-      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
-  getAllSuppliers: async () => {
-    const response = await fetch(`${API_BASE_URL}/suppliers`, { headers: getAuthHeaders() });
-    return handleResponse(response);
-  },
-  updateSupplier: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
-      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
-  deleteSupplier: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
-      method: 'DELETE', headers: getAuthHeaders(),
-    });
-    return handleResponse(response);
-  },
+ createClient: async (data) => {
+  // data must include clientType: "supplier" or "customer"
+  const response = await fetch(`${API_BASE_URL}/clients`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+},
+getAllClients: async () => {
+  const response = await fetch(`${API_BASE_URL}/clients`, { headers: getAuthHeaders() });
+  return handleResponse(response);
+},
+getSuppliers: async () => {
+  // Filter client-side after fetching all, or add a query param to backend later
+  const response = await fetch(`${API_BASE_URL}/clients`, { headers: getAuthHeaders() });
+  const result = await handleResponse(response);
+  return { data: result.data.filter(c => c.clientType === 'supplier') };
+},
+getCustomers: async () => {
+  const response = await fetch(`${API_BASE_URL}/clients`, { headers: getAuthHeaders() });
+  const result = await handleResponse(response);
+  return { data: result.data.filter(c => c.clientType === 'customer') };
+},
+updateClient: async (id, data) => {
+  const response = await fetch(`${API_BASE_URL}/clients/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+},
+deleteClient: async (id) => {
+  const response = await fetch(`${API_BASE_URL}/clients/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+},
 
-  // CUSTOMERS
-  createCustomer: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/customers`, {
-      method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
-  getAllCustomers: async () => {
-    const response = await fetch(`${API_BASE_URL}/customers`, { headers: getAuthHeaders() });
-    return handleResponse(response);
-  },
-  updateCustomer: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
-      method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
-  deleteCustomer: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
-      method: 'DELETE', headers: getAuthHeaders(),
-    });
-    return handleResponse(response);
-  },
 
 };
