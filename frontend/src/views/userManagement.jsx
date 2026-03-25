@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from './components/Logo';
-
-const API_BASE = 'http://localhost:8000';
-const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` });
-
-const authAPI = {
-  getAll:     ()         => fetch(`${API_BASE}/auth/users`,                  { headers: headers() }).then(r => r.json()),
-  create:     (data)     => fetch(`${API_BASE}/auth/create-user`,            { method:'POST',  headers: headers(), body: JSON.stringify(data) }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; }),
-  update:     (id, data) => fetch(`${API_BASE}/auth/users/${id}`,            { method:'PUT',   headers: headers(), body: JSON.stringify(data) }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; }),
-  activate:   (id)       => fetch(`${API_BASE}/auth/users/${id}/activate`,   { method:'PATCH', headers: headers() }).then(r => r.json()),
-  deactivate: (id)       => fetch(`${API_BASE}/auth/users/${id}/deactivate`, { method:'PATCH', headers: headers() }).then(r => r.json()),
-};
+import accountController from './controllers/accountController.js';
 
 const TEAMS = ['Record-to-Report', 'Purchase-to-Pay', 'Order-to-Cash'];
 
@@ -36,75 +26,94 @@ export default function UserManagement() {
     fetchUsers();
   }, [navigate]);
 
+  // ── CONTROLLER CALL: US 1.2 — Consult accounts list ──────────────────────
   const fetchUsers = async () => {
     setLoading(true); setError('');
-    try { const d = await authAPI.getAll(); setUsers(Array.isArray(d) ? d : []); }
-    catch { setError('Failed to load users'); }
-    finally { setLoading(false); }
+    try {
+      const { data } = await accountController.getAllUsers();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setError('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openCreate = () => {
     setModalMode('create');
     setForm({ email:'', password:'', role:'member', fullName:'', telephone:'', team:'' });
-    setFormErrors({}); 
+    setFormErrors({});
     setShowModal(true); setError(''); setMessage('');
   };
 
   const openEdit = (user) => {
     setModalMode('edit'); setSelectedUser(user);
-    // Password intentionally excluded — only the account owner can change their password
     setForm({ email: user.email, role: user.role, fullName: user.fullName||'', telephone: user.telephone||'', team: user.team||'' });
     setFormErrors({});
     setShowModal(true); setError(''); setMessage('');
   };
+
   const validateTelephone = (value) => {
-  if (!value) return ""; // optional field, empty is fine
-  const phoneRegex = /^\+?[0-9\s\-().]{7,20}$/;
-  if (!phoneRegex.test(value)) return "Invalid phone number format.";
-  if (value.replace(/\D/g, "").length < 7) return "Phone number too short.";
-  return "";
-};
+    if (!value) return "";
+    const phoneRegex = /^\+?[0-9\s\-().]{7,20}$/;
+    if (!phoneRegex.test(value)) return "Invalid phone number format.";
+    if (value.replace(/\D/g, "").length < 7) return "Phone number too short.";
+    return "";
+  };
 
   const handleChange = (e) => {
-  const { name, value } = e.target;
-  setForm(p => ({ ...p, [name]: value }));
-  if (name === "telephone") {
-    setFormErrors(p => ({ ...p, telephone: validateTelephone(value) }));
-  }
-};
+    const { name, value } = e.target;
+    setForm(p => ({ ...p, [name]: value }));
+    if (name === "telephone") {
+      setFormErrors(p => ({ ...p, telephone: validateTelephone(value) }));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const telError = validateTelephone(form.telephone);
-  if (telError) {
-    setFormErrors(p => ({ ...p, telephone: telError }));
-    return;
-  }
+    if (telError) {
+      setFormErrors(p => ({ ...p, telephone: telError }));
+      return;
+    }
 
-  setLoading(true); setError('');
-  try {
+    setLoading(true); setError('');
+    try {
       if (modalMode === 'create') {
-        await authAPI.create(form);
+        // ── CONTROLLER CALL: US 1.2.1 — Create employee account ───
+        await accountController.createAccount(form);
         setMessage(`Account created! Credentials sent to ${form.email}.`);
       } else {
-        
-        const { password: _p, ...updateData } = form;
-        await authAPI.update(selectedUser.id, updateData);
+        // ── CONTROLLER CALL: US 1.2.3 — Edit employee account ─────
+        // Note: email and password excluded — read-only per use case spec
+        const { password: _p, email: _e, ...updateData } = form;
+        await accountController.editAccount(selectedUser.id, updateData);
         setMessage('Account updated successfully!');
       }
       setTimeout(() => { setShowModal(false); setMessage(''); fetchUsers(); }, 1600);
-    } catch (err) { setError(err.detail || JSON.stringify(err) || 'Operation failed'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err?.response?.data?.detail || JSON.stringify(err) || 'Operation failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggle = async (id, isActive) => {
     if (!window.confirm(`${isActive ? 'Deactivate' : 'Activate'} this account?`)) return;
     try {
-      if (isActive) await authAPI.deactivate(id);
-      else          await authAPI.activate(id);
+      if (isActive) {
+        // ── CONTROLLER CALL: US 1.2.2 — Deactivate account ────────
+        await accountController.deactivateAccount(id);
+      } else {
+        // ── CONTROLLER CALL: US 1.2.2 — Activate account ──────────
+        await accountController.activateAccount(id);
+      }
       setMessage(`Account ${isActive ? 'deactivated' : 'activated'}!`);
-      fetchUsers(); setTimeout(() => setMessage(''), 2500);
-    } catch { setError('Failed to update status'); }
+      fetchUsers();
+      setTimeout(() => setMessage(''), 2500);
+    } catch {
+      setError('Failed to update status');
+    }
   };
 
   const roleBadge = (role) => {
@@ -168,7 +177,6 @@ export default function UserManagement() {
                           style={{ ...S.toggleBtn, backgroundColor: u.is_active!==false?'#F59E0B':'#16A34A' }}>
                           {u.is_active!==false?'Deactivate':'Activate'}
                         </button>
-                        {/* Delete intentionally removed — deactivate instead */}
                       </div>
                     </td>
                   </tr>
@@ -194,7 +202,6 @@ export default function UserManagement() {
                 <Field label="Full Name"><input type="text" name="fullName" value={form.fullName} onChange={handleChange} placeholder="e.g. Sarah Johnson" style={F.input} /></Field>
                 <Field label="Email Address *"><input type="email" name="email" value={form.email} onChange={handleChange} placeholder="sarah@tui.com" style={F.input} required /></Field>
 
-                {/* Password only shown on CREATE — on edit, only the user themselves can change it */}
                 {modalMode === 'create' && (
                   <Field label="Temporary Password *">
                     <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="••••••••" style={F.input} required />
@@ -214,23 +221,18 @@ export default function UserManagement() {
                   </select>
                 </Field>
                 <Field label="Telephone">
-  <input
-    type="text"
-    name="telephone"
-    value={form.telephone}
-    onChange={handleChange}
-    placeholder="+216 XX XXX XXX"
-    style={{
-      ...F.input,
-      borderColor: formErrors.telephone ? '#D40E14' : '#E5E7EB',
-    }}
-  />
-  {formErrors.telephone && (
-    <span style={{ fontSize: 11, color: '#D40E14', marginTop: 4 }}>
-      {formErrors.telephone}
-    </span>
-  )}
-</Field>
+                  <input
+                    type="text"
+                    name="telephone"
+                    value={form.telephone}
+                    onChange={handleChange}
+                    placeholder="+216 XX XXX XXX"
+                    style={{ ...F.input, borderColor: formErrors.telephone ? '#D40E14' : '#E5E7EB' }}
+                  />
+                  {formErrors.telephone && (
+                    <span style={{ fontSize: 11, color: '#D40E14', marginTop: 4 }}>{formErrors.telephone}</span>
+                  )}
+                </Field>
                 <Field label="Team">
                   <select name="team" value={form.team} onChange={handleChange} style={F.input}>
                     <option value="">— Select team —</option>

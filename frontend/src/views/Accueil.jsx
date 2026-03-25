@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logo from './components/Logo';
+import Logo from '../components/Logo';
 
 function Accueil() {
   const navigate = useNavigate();
