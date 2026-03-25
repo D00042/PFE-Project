@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logo from './components/Logo';
-import accountController from './controllers/accountController.js';
+import Logo from '../components/Logo';
+import accountController from '../controllers/accountController.js';
 
 const TEAMS = ['Record-to-Report', 'Purchase-to-Pay', 'Order-to-Cash'];
 
 export default function UserManagement() {
   
   const navigate = useNavigate();
-  const [users, setUsers]         = useState([]);
+  const [users, setUsers]         = useState([]); 
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [message, setMessage]     = useState('');

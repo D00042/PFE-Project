@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-
-const API = "http://127.0.0.1:8000"
+import accessController from '../controllers/accessController.js'
 
 const DASHBOARDS = [
   { key: "profitability", label: "Profitability" },
@@ -17,16 +16,10 @@ export default function DashboardAccess() {
   const [pending, setPending] = useState({})
   const navigate = useNavigate()
 
-  const token = localStorage.getItem("token")
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
-  }
-
   useEffect(() => {
-    fetch(`${API}/dashboard-access/leaders`, { headers })
-      .then(r => r.json())
-      .then(data => { setLeaders(data); setLoading(false) })
+    // ── CONTROLLER CALL: US 1.5.3 — View all leaders with permissions ──
+    accessController.getAllLeadersWithPermissions()
+      .then(({ data }) => { setLeaders(data); setLoading(false) })
       .catch(() => { showToast("Failed to load data.", "error"); setLoading(false) })
   }, [])
 
@@ -34,6 +27,7 @@ export default function DashboardAccess() {
     const key     = `${userId}-${dashboard}`
     const enabled = !currentValue
 
+    // Optimistic update
     setLeaders(prev => prev.map(l =>
       l.id === userId
         ? { ...l, permissions: { ...l.permissions, [dashboard]: enabled } }
@@ -42,15 +36,11 @@ export default function DashboardAccess() {
     setPending(p => ({ ...p, [key]: true }))
 
     try {
-      const res = await fetch(`${API}/dashboard-access/leaders/${userId}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ dashboard, enabled }),
-      })
-      if (!res.ok) throw new Error()
-      const data = await res.json()
+      // ── CONTROLLER CALL: US 1.5.1 / 1.5.2 — Grant or revoke access ──
+      const { data } = await accessController.toggleDashboardAccess(userId, dashboard, enabled)
       showToast(data.message, "success")
     } catch {
+      // Revert on failure
       setLeaders(prev => prev.map(l =>
         l.id === userId
           ? { ...l, permissions: { ...l.permissions, [dashboard]: currentValue } }
@@ -67,11 +57,12 @@ export default function DashboardAccess() {
     setTimeout(() => setToast(null), 3000)
   }
 
-    const handleLogout = () => {
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
-        navigate("/login")
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    navigate("/login")
+  }
+
   return (
     <div style={styles.page}>
       <nav style={styles.nav}>

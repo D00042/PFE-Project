@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import dataController from './controllers/dataContoller.js';
-import Logo from '../components/Logo';
+import dataController from '../controllers/dataController.js';
+import Logo from '../components/Logo.jsx';
 
 const FISCAL_PERIOD_MAP = { 'October':'P1','November':'P2','December':'P3','January':'P4','February':'P5','March':'P6','April':'P7','May':'P8','June':'P9','July':'P10','August':'P11','September':'P12' };
 const FISCAL_MONTHS = ['October','November','December','January','February','March','April','May','June','July','August','September'];
@@ -97,8 +97,6 @@ function calcAging(netDate, targetDate) {
   return { days, agingDays, agingYear };
 }
 
-
-
 const CATEGORIES = [
   { key: 'revenue',  label: 'Revenue & Expenses',  endpoint: '/revenue-expenses' },
   { key: 'assets',   label: 'Assets & Liabilities', endpoint: '/asset-liabilities' },
@@ -120,7 +118,6 @@ const emptyForms = {
   clients:  { clientName: '', clientType: 'supplier', amount: '', expenseCategory: '', netDate: '', targetDate: '', year: '', address: '', telephone: '' },
 };
 
-// ── Reusable year field component ─────────────────────────────────────────────
 function YearField({ value, onChange }) {
   const yearVal = parseInt(value);
   const isEmpty = !value;
@@ -157,7 +154,6 @@ function YearField({ value, onChange }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function DataManagement() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('revenue');
@@ -186,11 +182,17 @@ export default function DataManagement() {
     setSearchQuery(''); setActiveFilters({}); setShowFilters(false); fetchEntries();
   }, [activeCategory]);
 
+  // ── CONTROLLER CALL: fetch all entries for the active category ────────────
   const fetchEntries = async () => {
     setLoading(true); setError('');
-    try { const d = await controller.get(currentCat.endpoint); setEntries(Array.isArray(d) ? d : []); }
-    catch { setError('Failed to load data'); }
-    finally { setLoading(false); }
+    try {
+      const data = await dataController.get(currentCat.endpoint);
+      setEntries(Array.isArray(data) ? data : []);
+    } catch {
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredEntries = useMemo(() => {
@@ -248,10 +250,10 @@ export default function DataManagement() {
     setForm(f); setShowModal(true); setError(''); setMessage('');
   };
 
+  // ── CONTROLLER CALL: create or update an entry ────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true); setError('');
 
-    // ── Year validation ──
     const yearVal = parseInt(form.year);
     if (!form.year || isNaN(yearVal)) {
       setError('Year is required.'); setLoading(false); return;
@@ -264,22 +266,30 @@ export default function DataManagement() {
       const { period, createdAt, updatedAt, daysOutstanding, agingDays, agingYear, id, ...payload } = form;
       const final = { ...payload, userId: currentUser?.id ?? 1 };
       if (modalMode === 'create') {
-        await controller.post(currentCat.endpoint, final);
+        await dataController.post(currentCat.endpoint, final);
         setMessage('Entry created!');
       } else {
         const { userId: _u, ...upd } = final;
-        await controller.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
+        await dataController.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
         setMessage('Entry updated!');
       }
       setTimeout(() => { setShowModal(false); setMessage(''); fetchEntries(); }, 1200);
-    } catch (err) { setError(err.detail || JSON.stringify(err) || 'Operation failed'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err?.response?.data?.detail || JSON.stringify(err) || 'Operation failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ── CONTROLLER CALL: delete an entry ─────────────────────────────────────
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this entry?')) return;
-    try { await controller.delete(`${currentCat.endpoint}/${id}`); fetchEntries(); }
-    catch { setError('Failed to delete'); }
+    try {
+      await dataController.delete(`${currentCat.endpoint}/${id}`);
+      fetchEntries();
+    } catch {
+      setError('Failed to delete');
+    }
   };
 
   const getColumns = () => {
@@ -302,7 +312,6 @@ export default function DataManagement() {
 
   const renderFields = () => {
 
-    // ── Revenue & Expenses ──────────────────────────────────────────────────
     if (activeCategory === 'revenue') return (
       <div style={F.grid2}>
         <div style={F.span2}>
@@ -314,7 +323,6 @@ export default function DataManagement() {
           </Field>
         </div>
 
-        {/* Code — dropdown for Other Overheads, read-only otherwise */}
         {form.label === 'Other Overheads' ? (
           <div style={F.span2}>
             <Field label="Code * (select to auto-fill category)">
@@ -344,7 +352,6 @@ export default function DataManagement() {
           </Field>
         )}
 
-        {/* Category preview — only for Other Overheads */}
         {form.label === 'Other Overheads' && (
           <div style={F.span2}>
             <Field label="Category (auto-filled)">
@@ -390,7 +397,6 @@ export default function DataManagement() {
       </div>
     );
 
-    // ── Assets & Liabilities ────────────────────────────────────────────────
     if (activeCategory === 'assets') return (
       <div style={F.grid2}>
         <div style={F.span2}>
@@ -437,7 +443,6 @@ export default function DataManagement() {
       </div>
     );
 
-    // ── Cash Flow ───────────────────────────────────────────────────────────
     if (activeCategory === 'cashflow') return (
       <div style={F.grid2}>
         <div style={F.span2}>
@@ -469,7 +474,6 @@ export default function DataManagement() {
       </div>
     );
 
-    // ── Clients ─────────────────────────────────────────────────────────────
     if (activeCategory === 'clients') return (
       <div style={F.grid2}>
         <Field label="Client Name *">
@@ -533,7 +537,6 @@ export default function DataManagement() {
   return (
     <div style={S.page}>
 
-      {/* Header */}
       <div style={S.header}>
         <div style={S.headerInner}>
           <div style={S.headerLeft}>
@@ -553,7 +556,6 @@ export default function DataManagement() {
 
       <div style={S.body}>
 
-        {/* Category tabs */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
           {CATEGORIES.map(cat => (
             <button key={cat.key}
@@ -570,7 +572,6 @@ export default function DataManagement() {
           ))}
         </div>
 
-        {/* Action bar */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <button onClick={openCreate} style={S.addBtn}>+ Add Entry</button>
           <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
@@ -600,7 +601,6 @@ export default function DataManagement() {
           <button onClick={fetchEntries} style={S.refreshBtn}>↺ Refresh</button>
         </div>
 
-        {/* Filters panel */}
         {showFilters && currentFilters.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '16px 20px', backgroundColor: 'white', borderRadius: 16, border: '2px solid #E5E7EB', marginBottom: 16 }}>
             {currentFilters.map(filter => (
@@ -628,7 +628,6 @@ export default function DataManagement() {
         {message && <div style={S.msgSuccess}>{message}</div>}
         {error   && <div style={S.msgError}>{error}</div>}
 
-        {/* Table */}
         <div style={S.tableWrap}>
           <div style={{ overflowX: 'auto' }}>
             <table style={S.table}>
@@ -659,7 +658,6 @@ export default function DataManagement() {
         </div>
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div style={S.overlay}>
           <div style={S.modal}>
@@ -688,7 +686,6 @@ export default function DataManagement() {
   );
 }
 
-// ── Field wrapper ─────────────────────────────────────────────────────────────
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -698,7 +695,6 @@ function Field({ label, children }) {
   );
 }
 
-// ── Style tokens ──────────────────────────────────────────────────────────────
 const F = {
   grid2:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
   span2:   { gridColumn: '1 / -1' },
