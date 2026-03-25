@@ -11,16 +11,16 @@ FISCAL_PERIOD_MAP = {
 
 def calculate_aging(net_date, target_date):
     if not net_date or not target_date:
-        return "Not due", None
+        return "Not Due", None
     if hasattr(net_date, 'date'):    net_date    = net_date.date()
     if hasattr(target_date, 'date'): target_date = target_date.date()
     days = (target_date - net_date).days if target_date > net_date else 0
-    if   days == 0:   return "Not due",     None
-    elif days <= 30:  return "0-30 days",   None
-    elif days <= 61:  return "31-61 days",  None
-    elif days <= 90:  return "61-90 days",  None
-    elif days <= 180: return "90-180 days", None
-    else:             return ">180 days",   target_date.year
+    if   days == 0:   return "Not Due",     None
+    elif days <= 30:  return "0-30 Days",   None
+    elif days <= 61:  return "31-61 Days",  None
+    elif days <= 90:  return "61-90 Days",  None
+    elif days <= 180: return "90-180 Days", None
+    else:             return ">180 Days",   target_date.year
 
 class RevenueExpense(Base):
     __tablename__ = "revenue_expenses"

@@ -222,16 +222,18 @@ FISCAL_MONTHS_IN_ORDER = [
 @router.get("/dashboard/profitability")
 def get_profitability_dashboard(
     year: int,
-    period: str = "P12",
+    period: str = "P12",          # ← new param, defaults to full year
     db: Session = Depends(get_db),
 ):
+    # Convert "P3" → keep only the first 3 fiscal months (Oct, Nov, Dec)
     try:
         period_index = int(period.replace("P", ""))
     except ValueError:
         period_index = 12
- 
+
     active_months = FISCAL_MONTHS_IN_ORDER[:period_index]
- 
+
+    # Filter BOTH years to only the active months
     current  = db.query(RevenueExpense).filter(
         RevenueExpense.year == year,
         RevenueExpense.month.in_(active_months)
@@ -240,21 +242,16 @@ def get_profitability_dashboard(
         RevenueExpense.year == year - 1,
         RevenueExpense.month.in_(active_months)
     ).all()
-    budget = db.query(RevenueExpense).filter(
-        RevenueExpense.year == year,
-        RevenueExpense.month.in_(active_months),
-        RevenueExpense.type == "budget"   
-    ).all()
- 
+
     def sum_by_label(entries, label):
         return sum(e.value or 0 for e in entries if e.label == label)
- 
+
     def sum_by_category(entries, category):
         return sum(e.value or 0 for e in entries
                if e.label == "Other Overheads" and e.category == category)
- 
+   
     snapshot_month = active_months[-1]
- 
+
     assets_curr = db.query(AssetLiability).filter(
         AssetLiability.year == year,
         AssetLiability.month == snapshot_month
@@ -263,18 +260,19 @@ def get_profitability_dashboard(
         AssetLiability.year == year - 1,
         AssetLiability.month == snapshot_month
     ).all()
- 
+
     def ss_assets(entries, subcategory):
         return sum(e.value or 0 for e in entries
                    if (e.subCategory or "").strip().lower() == subcategory.strip().lower())
- 
+
     non_curr_assets_c = ss_assets(assets_curr, "SB Non-current Assets")
     non_curr_assets_p = ss_assets(assets_prev, "SB Non-current Assets")
     curr_assets_c     = ss_assets(assets_curr, "SB Current Assets")
     curr_assets_p     = ss_assets(assets_prev, "SB Current Assets")
     total_assets_c    = non_curr_assets_c + curr_assets_c
     total_assets_p    = non_curr_assets_p + curr_assets_p
- 
+
+
     rev_curr      = sum_by_label(current,  "Revenue")
     rev_prev      = sum_by_label(previous, "Revenue")
     ebit_curr     = sum_by_label(current,  "EBIT")
@@ -283,14 +281,14 @@ def get_profitability_dashboard(
     retained_prev = sum_by_label(previous, "Retained Profit/(loss)")
     staff_cur     = sum_by_label(current,  "Staff Costs")
     staff_prev    = sum_by_label(previous, "Staff Costs")
- 
+
     gross_margin_curr = round((rev_curr - staff_cur)  / rev_curr * 100, 2) if rev_curr else 0
     gross_margin_prev = round((rev_prev - staff_prev) / rev_prev * 100, 2) if rev_prev else 0
     ebit_margin_curr  = round(ebit_curr     / rev_curr * 100, 2) if rev_curr else 0
     ebit_margin_prev  = round(ebit_prev     / rev_prev * 100, 2) if rev_prev else 0
     net_margin_curr   = round(retained_curr / rev_curr * 100, 2) if rev_curr else 0
     net_margin_prev   = round(retained_prev / rev_prev * 100, 2) if rev_prev else 0
- 
+
     pl_labels = [
         "Revenue", "Staff Costs", "Overhead Depreciation",
         "Other Overheads", "Total Miscellaneous Overheads",
@@ -304,7 +302,7 @@ def get_profitability_dashboard(
         }
         for lbl in pl_labels
     ]
- 
+
     overhead_categories = [
         "Property Costs", "Communication Costs", "Travel And Entertainment",
         "Office Costs", "Computer Costs", "Professional Fees",
@@ -317,43 +315,26 @@ def get_profitability_dashboard(
         }
         for cat in overhead_categories
     ]
- 
-    # Monthly trend — includes retained profit for Profit Evolution chart
+
+    # Monthly trend — only active months, in fiscal order
     monthly_trend = []
-    prev_rev = None
     for m in active_months:
         rev = sum(e.value for e in current  if e.label == "Revenue" and e.month == m)
-        bud    = sum(e.value for e in budget  if e.label == "Revenue" and e.month == m)
         exp = sum(e.value for e in current  if e.label not in ("Revenue",) and e.month == m)
         ebt = sum(e.value for e in current  if e.label == "EBIT"    and e.month == m)
-        ret = sum(e.value for e in current  if e.label == "Retained Profit/(loss)" and e.month == m)
-        growth = round((rev - prev_rev) / abs(prev_rev) * 100, 2) if prev_rev else 0
         monthly_trend.append({
-            "month":    FISCAL_PERIOD_MAP[m],
+            "month":    m[:3],
             "revenue":  round(rev, 2),
-            "budget": round(bud, 2),
             "expenses": round(exp, 2),
             "ebit":     round(ebt, 2),
-            "retained": round(ret, 2),
-            "revenueGrowth": growth,
         })
-        prev_rev = rev if rev != 0 else prev_rev
- 
-    # Expenses breakdown for pie chart
-    expense_labels = ["Staff Costs", "Overhead Depreciation", "Other Overheads",
-                      "Total Miscellaneous Overheads", "Interest"]
-    expenses_breakdown = [
-        {"name": lbl, "value": abs(round(sum_by_label(current, lbl), 2))}
-        for lbl in expense_labels
-        if sum_by_label(current, lbl) != 0
-    ]
- 
+
     funnel = [
         {"name": "Gross Profit Margin", "value": abs(gross_margin_curr)},
         {"name": "EBIT Margin",         "value": abs(ebit_margin_curr)},
         {"name": "Net Profit Margin",   "value": abs(net_margin_curr)},
     ]
- 
+
     return {
         "kpis": {
             "grossMargin":    {"current": gross_margin_curr, "previous": gross_margin_prev},
@@ -367,13 +348,11 @@ def get_profitability_dashboard(
                 "previous": round(retained_prev / non_curr_assets_p * 100, 2) if non_curr_assets_p else 0,},
             "totalRevenue":   {"current": round(rev_curr,2), "previous": round(rev_prev,2)},
         },
-        "plSummary":         pl_summary,
-        "overheadsDetail":   overheads_detail,
-        "monthlyTrend":      monthly_trend,
-        "expensesBreakdown": expenses_breakdown,
-        "funnel":            funnel,
+        "plSummary":       pl_summary,
+        "overheadsDetail": overheads_detail,
+        "monthlyTrend":    monthly_trend,
+        "funnel":          funnel,
     }
- 
 @router.get("/dashboard/balance-sheet")
 def get_balance_sheet_dashboard(
     year: int,
@@ -384,9 +363,9 @@ def get_balance_sheet_dashboard(
         period_index = int(period.replace("P", "")) - 1
     except ValueError:
         period_index = 11
- 
+
     selected_month = FISCAL_MONTHS_IN_ORDER[period_index]
- 
+
     current  = db.query(AssetLiability).filter(
         AssetLiability.year == year,
         AssetLiability.month == selected_month
@@ -395,34 +374,45 @@ def get_balance_sheet_dashboard(
         AssetLiability.year == year - 1,
         AssetLiability.month == selected_month
     ).all()
- 
+
     def sl(entries, label):
         return sum(e.value or 0 for e in entries
                    if (e.label or "").strip().lower() == label.strip().lower())
- 
+
     def ss(entries, subcategory):
         return sum(e.value or 0 for e in entries
                    if (e.subCategory or "").strip().lower() == subcategory.strip().lower())
- 
+
+    # ── Non-current Assets: sum all rows with subCategory = "SB Non-current Assets"
     non_curr_c = ss(current,  "SB Non-current Assets")
     non_curr_p = ss(previous, "SB Non-current Assets")
+
+    # ── Current Assets: sum all rows with subCategory = "SB Current Assets"
     curr_c = ss(current,  "SB Current Assets")
     curr_p = ss(previous, "SB Current Assets")
+
+    # ── Total Assets
     total_assets_c = non_curr_c + curr_c
     total_assets_p = non_curr_p + curr_p
- 
+
+    # ── Equity: only "Equity holders of parent" exists in your data
     equity_c = sl(current,  "Equity holders of parent")
     equity_p = sl(previous, "Equity holders of parent")
- 
+
+    # ── Non-current Liabilities: sum subCategory = "SB Non-current Provisions and Liabilities"
+    # BUT BST240000T has label = "SB Non-current provisions and liabilities" so use sl()
     ncl_c = sl(current,  "SB Non-current provisions and liabilities")
     ncl_p = sl(previous, "SB Non-current provisions and liabilities")
- 
+
+    # ── Current Liabilities: sum all rows with subCategory = "SB Current Provisions And Liabilities"
     cl_c = ss(current,  "SB Current Provisions And Liabilities")
     cl_p = ss(previous, "SB Current Provisions And Liabilities")
- 
+
+    # ── Total Equity and Liabilities
     total_eq_liab_c = equity_c + ncl_c + cl_c
     total_eq_liab_p = equity_p + ncl_p + cl_p
- 
+
+    # ── Individual line items
     cash_c    = sl(current,  "SB Cash and cash equivalents")
     cash_p    = sl(previous, "SB Cash and cash equivalents")
     recv_c    = sl(current,  "Current trade and other receivables")
@@ -435,7 +425,8 @@ def get_balance_sheet_dashboard(
     other_p   = sl(previous, "Current other assets - non-financial instruments")
     tax_rec_c = sl(current,  "Current income tax recoverable")
     tax_rec_p = sl(previous, "Current income tax recoverable")
- 
+
+    # ── KPIs
     total_liab_c   = ncl_c + cl_c
     total_liab_p   = ncl_p + cl_p
     equity_ratio_c = round(equity_c / total_assets_c * 100, 2) if total_assets_c else 0
@@ -446,14 +437,14 @@ def get_balance_sheet_dashboard(
     curr_ratio_p   = round(curr_p / cl_p, 2) if cl_p else 0
     de_c           = round(total_liab_c / equity_c, 2) if equity_c else 0
     de_p           = round(total_liab_p / equity_p, 2) if equity_p else 0
- 
+
     def row(label):
         return {
             "label":    label,
             "current":  round(sl(current,  label), 2),
             "previous": round(sl(previous, label), 2),
         }
- 
+
     return {
         "snapshotMonth": selected_month,
         "kpis": {
@@ -493,19 +484,9 @@ def get_balance_sheet_dashboard(
                 row("Current income tax payable"),
                 row("Current lease liabilities (IFRS 16)"),
             ],
-            # ── NEW: Charts for asset/liability structure ──────────────────
-            "assetsVsLiabilities": [
-                {"label": "Non-Current", "assets": round(non_curr_c,2), "liabilities": round(ncl_c,2)},
-                {"label": "Current",     "assets": round(curr_c,2),     "liabilities": round(cl_c,2)},
-                {"label": "Total",       "assets": round(total_assets_c,2), "liabilities": round(total_liab_c,2)},
-            ],
             "assetStructure": [
-                {"name": "Non-Current Assets", "value": round(non_curr_c, 2)},
-                {"name": "Current Assets",     "value": round(curr_c, 2)},
-            ],
-            "liabilityStructure": [
-                {"name": "Non-Current Liabilities", "value": round(ncl_c, 2)},
-                {"name": "Current Liabilities",     "value": round(cl_c, 2)},
+                {"label": "Non-Current", "current": round(non_curr_c,2), "previous": round(non_curr_p,2)},
+                {"label": "Current",     "current": round(curr_c,2),     "previous": round(curr_p,2)},
             ],
             "currentAssetsBreakdown": [
                 {"label": "Trade Receivables", "current": round(recv_c,2),    "previous": round(recv_p,2)},
@@ -719,7 +700,7 @@ FISCAL_MONTHS_DSO = [
 ]
 PERIOD_TO_IDX_DSO = {f"P{i+1}": i for i in range(12)}
 
-    
+
 @router.get("/dashboard/dso-dpo")
 def get_dso_dpo_dashboard(
     year:   int = 2025,
@@ -728,84 +709,83 @@ def get_dso_dpo_dashboard(
 ):
     from sqlalchemy import func
 
-    # Active months up to selected period
-    idx            = PERIOD_TO_IDX_DSO.get(period, 11)
-    active_months  = FISCAL_MONTHS_DSO[:idx + 1]
-    prev_year      = year - 1
+    idx           = PERIOD_TO_IDX_DSO.get(period, 11)
+    active_months = FISCAL_MONTHS_DSO[:idx + 1]
+    prev_year     = year - 1
+    prev2_year    = year - 2
 
-    # ── Fetch clients ─────────────────────────────────────────────────────
-    customers = db.query(Client).filter(
-        Client.year == year,
-        Client.clientType.in_(["customer", "Customer"])
-    ).all()
+    def get_clients(yr, ctype):
+        return db.query(Client).filter(
+            Client.year == yr,
+            Client.clientType.in_([ctype, ctype.capitalize()])
+        ).all()
 
-    suppliers = db.query(Client).filter(
-        Client.year == year,
-        Client.clientType.in_(["supplier", "Supplier"])
-    ).all()
+    customers_curr  = get_clients(year,       "customer")
+    customers_prev  = get_clients(prev_year,  "customer")
+    customers_prev2 = get_clients(prev2_year, "customer")
+    suppliers_curr  = get_clients(year,       "supplier")
+    suppliers_prev  = get_clients(prev_year,  "supplier")
+    suppliers_prev2 = get_clients(prev2_year, "supplier")
 
-    # ── Revenue filtered by active months ─────────────────────────────────
-    revenue = db.query(func.sum(RevenueExpense.value)).filter(
-        RevenueExpense.year == year,
-        RevenueExpense.label == "Revenue",
-        RevenueExpense.month.in_(active_months)
-    ).scalar() or 0
+    def get_revenue(yr):
+        return db.query(func.sum(RevenueExpense.value)).filter(
+            RevenueExpense.year == yr,
+            RevenueExpense.label == "Revenue",
+            RevenueExpense.month.in_(active_months)
+        ).scalar() or 0
 
-    prev_revenue = db.query(func.sum(RevenueExpense.value)).filter(
-        RevenueExpense.year == prev_year,
-        RevenueExpense.label == "Revenue",
-        RevenueExpense.month.in_(active_months)
-    ).scalar() or 0
+    revenue      = get_revenue(year)
+    prev_revenue = get_revenue(prev_year)
 
-    # ── Trade Receivables & Payables ──────────────────────────────────────
-    trade_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Current trade and other receivables"
-    ).scalar() or 0
+    def get_al(yr, label):
+        return db.query(func.sum(AssetLiability.value)).filter(
+            AssetLiability.year == yr,
+            AssetLiability.month.in_(active_months),
+            AssetLiability.label == label
+        ).scalar() or 0
 
-    trade_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Trade payables"
-    ).scalar() or 0
+    trade_recv = get_al(year,      "Current trade and other receivables")
+    trade_pay  = get_al(year,      "Trade payables")
+    prev_recv  = get_al(prev_year, "Current trade and other receivables")
+    prev_pay   = get_al(prev_year, "Trade payables")
 
-    prev_recv = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Current trade and other receivables"
-    ).scalar() or 0
-
-    prev_pay = db.query(func.sum(AssetLiability.value)).filter(
-        AssetLiability.year == prev_year,
-        AssetLiability.month.in_(active_months),
-        AssetLiability.label == "Trade payables"
-    ).scalar() or 0
-
-    # ── DSO / DPO ─────────────────────────────────────────────────────────
-    days = len(active_months) * 30
-    dso      = round((trade_recv / revenue) * days, 1) if revenue else 0
-    dpo      = round((trade_pay  / revenue) * days, 1) if revenue else 0
+    days     = len(active_months) * 30
+    dso      = round((trade_recv / revenue)      * days, 1) if revenue      else 0
+    dpo      = round((trade_pay  / revenue)      * days, 1) if revenue      else 0
     prev_dso = round((prev_recv  / prev_revenue) * days, 1) if prev_revenue else 0
     prev_dpo = round((prev_pay   / prev_revenue) * days, 1) if prev_revenue else 0
 
-    # ── Aging buckets ─────────────────────────────────────────────────────
     aging_buckets = [
-    "Not Due", "0-30 Days", "31-60 days", "61-90 days"
-]
+        "Not due", "0-30 days", "31-61 days",
+        "61-90 days", "90-180 days", ">180 days"
+    ]
 
+    # Customer aging — current year only (single bars per bucket)
     customer_aging = [
-        {"bucket": b, "amount": round(sum(c.amount for c in customers if c.agingDays == b), 2)}
+        {"bucket": b, "amount": round(sum(c.amount for c in customers_curr if c.agingDays == b), 2)}
         for b in aging_buckets
     ]
-    supplier_aging = [
-    {"bucket": b, "amount": round(sum(
-        s.amount for s in suppliers if (s.agingDays or "Not Due") == b
-    ), 2)}
-    for b in aging_buckets
-]
 
-    # ── Top unpaid ────────────────────────────────────────────────────────
+    # Supplier aging — 3 years grouped by bucket
+    supplier_aging_by_year = []
+    for bucket in aging_buckets:
+        curr  = sum(s.amount for s in suppliers_curr  if s.agingDays == bucket)
+        prev  = sum(s.amount for s in suppliers_prev  if s.agingDays == bucket)
+        prev2 = sum(s.amount for s in suppliers_prev2 if s.agingDays == bucket)
+        if curr > 0 or prev > 0 or prev2 > 0:
+            supplier_aging_by_year.append({
+                "bucket":        bucket,
+                str(year):       round(curr,  2),
+                str(prev_year):  round(prev,  2),
+                str(prev2_year): round(prev2, 2),
+            })
+
+    # Supplier aging pie (current year)
+    supplier_aging = [
+        {"bucket": b, "amount": round(sum(s.amount for s in suppliers_curr if s.agingDays == b), 2)}
+        for b in aging_buckets
+    ]
+
     def top_clients(clients, n):
         totals = {}
         for c in clients:
@@ -815,22 +795,20 @@ def get_dso_dpo_dashboard(
             key=lambda x: x["amount"], reverse=True
         )[:n]
 
-    top_customers = top_clients(customers, 10)
-    top_suppliers = top_clients(suppliers, 5)
+    top_customers = top_clients(customers_curr, 10)
+    top_suppliers = top_clients(suppliers_curr, 5)
 
-    # ── Delay distribution histogram ──────────────────────────────────────
     customer_delay_dist = [
-        {"bucket": b, "count": sum(1 for c in customers if c.agingDays == b)}
+        {"bucket": b, "count": sum(1 for c in customers_curr if c.agingDays == b)}
         for b in aging_buckets
     ]
     supplier_delay_dist = [
-    {"bucket": b, "count": sum(1 for s in suppliers if (s.agingDays or "Not Due") == b)}
-    for b in aging_buckets
-]
+        {"bucket": b, "count": sum(1 for s in suppliers_curr if s.agingDays == b)}
+        for b in aging_buckets
+    ]
 
-    # ── Overdue totals ────────────────────────────────────────────────────
-    total_customer_overdue = round(sum(c.amount for c in customers if c.agingDays != "Not due"), 2)
-    total_supplier_overdue = round(sum(s.amount for s in suppliers if s.agingDays != "Not due"), 2)
+    total_customer_overdue = round(sum(c.amount for c in customers_curr if c.agingDays != "Not due"), 2)
+    total_supplier_overdue = round(sum(s.amount for s in suppliers_curr if s.agingDays != "Not due"), 2)
 
     return {
         "kpis": {
@@ -839,10 +817,16 @@ def get_dso_dpo_dashboard(
             "customerOverdue": {"current": total_customer_overdue, "previous": 0},
             "supplierOverdue": {"current": total_supplier_overdue, "previous": 0},
         },
-        "customerAging":     customer_aging,
-        "supplierAging":     supplier_aging,
-        "topCustomers":      top_customers,
-        "topSuppliers":      top_suppliers,
-        "customerDelayDist": customer_delay_dist,
-        "supplierDelayDist": supplier_delay_dist,
+        "customerAging":        customer_aging,
+        "supplierAging":        supplier_aging,
+        "supplierAgingByYear":  supplier_aging_by_year,
+        "topCustomers":         top_customers,
+        "topSuppliers":         top_suppliers,
+        "customerDelayDist":    customer_delay_dist,
+        "supplierDelayDist":    supplier_delay_dist,
+        "years": {
+            "current": year,
+            "prev":    prev_year,
+            "prev2":   prev2_year,
+        },
     }

@@ -26,6 +26,7 @@ export default function UserManagement() {
   const [modalMode, setModalMode] = useState('create');
   const [selectedUser, setSelectedUser] = useState(null);
   const [form, setForm] = useState({ email:'', password:'', role:'member', fullName:'', telephone:'', team:'' });
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -45,6 +46,7 @@ export default function UserManagement() {
   const openCreate = () => {
     setModalMode('create');
     setForm({ email:'', password:'', role:'member', fullName:'', telephone:'', team:'' });
+    setFormErrors({}); 
     setShowModal(true); setError(''); setMessage('');
   };
 
@@ -52,14 +54,35 @@ export default function UserManagement() {
     setModalMode('edit'); setSelectedUser(user);
     // Password intentionally excluded — only the account owner can change their password
     setForm({ email: user.email, role: user.role, fullName: user.fullName||'', telephone: user.telephone||'', team: user.team||'' });
+    setFormErrors({});
     setShowModal(true); setError(''); setMessage('');
   };
+  const validateTelephone = (value) => {
+  if (!value) return ""; // optional field, empty is fine
+  const phoneRegex = /^\+?[0-9\s\-().]{7,20}$/;
+  if (!phoneRegex.test(value)) return "Invalid phone number format.";
+  if (value.replace(/\D/g, "").length < 7) return "Phone number too short.";
+  return "";
+};
 
-  const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+  const { name, value } = e.target;
+  setForm(p => ({ ...p, [name]: value }));
+  if (name === "telephone") {
+    setFormErrors(p => ({ ...p, telephone: validateTelephone(value) }));
+  }
+};
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setLoading(true); setError('');
-    try {
+    e.preventDefault();
+    const telError = validateTelephone(form.telephone);
+  if (telError) {
+    setFormErrors(p => ({ ...p, telephone: telError }));
+    return;
+  }
+
+  setLoading(true); setError('');
+  try {
       if (modalMode === 'create') {
         await authAPI.create(form);
         setMessage(`Account created! Credentials sent to ${form.email}.`);
@@ -190,7 +213,24 @@ export default function UserManagement() {
                     <option value="manager">Manager</option>
                   </select>
                 </Field>
-                <Field label="Telephone"><input type="text" name="telephone" value={form.telephone} onChange={handleChange} placeholder="+216 XX XXX XXX" style={F.input} /></Field>
+                <Field label="Telephone">
+  <input
+    type="text"
+    name="telephone"
+    value={form.telephone}
+    onChange={handleChange}
+    placeholder="+216 XX XXX XXX"
+    style={{
+      ...F.input,
+      borderColor: formErrors.telephone ? '#D40E14' : '#E5E7EB',
+    }}
+  />
+  {formErrors.telephone && (
+    <span style={{ fontSize: 11, color: '#D40E14', marginTop: 4 }}>
+      {formErrors.telephone}
+    </span>
+  )}
+</Field>
                 <Field label="Team">
                   <select name="team" value={form.team} onChange={handleChange} style={F.input}>
                     <option value="">— Select team —</option>
