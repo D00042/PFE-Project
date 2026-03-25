@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_URL = "http://127.0.0.1:8000";
+import authController from "./controllers/authController.js";
 
 function AuthApp() {
   const [email, setEmail] = useState("");
@@ -11,7 +10,6 @@ function AuthApp() {
 
   const navigate = useNavigate();
 
-  // If already logged in, redirect straight to home
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user  = localStorage.getItem("user");
@@ -24,51 +22,33 @@ function AuthApp() {
     setLoading(true);
     setOutput("");
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (response.status === 403) {
-        setOutput("Your account has been disabled. Please contact your Team Leader.");
-        return;
-      }
+      // ── CONTROLLER CALL: US 1.1 Basic Scenario ──────────────────
+      const { data } = await authController.login({ email, password });
 
-      if (!response.ok) {
-        setOutput("Login failed: " + (data.detail || JSON.stringify(data)));
-        return;
-      }
-
-      // Store token
       localStorage.setItem("token", data.access_token);
 
-      // Fetch user profile to get role
-      const meRes = await fetch(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-      });
-
-      if (meRes.status === 401) {
-        setOutput("Authentication failed. Please try again.");
-        localStorage.removeItem("token");
-        return;
-      }
-
-      const meData = await meRes.json();
+      // ── CONTROLLER CALL: US 1.1 — fetch role after login ────────
+      const { data: meData } = await authController.getProfile();
       const userData = { id: meData.id, email: meData.email, role: meData.role };
       localStorage.setItem("user", JSON.stringify(userData));
 
-      // Redirect to home
       navigate("/home");
 
     } catch (err) {
-      setOutput("Network error. Is the backend running?");
+      // ── Alternative Scenario 3.2: deactivated account ───────────
+      if (err?.response?.status === 403) {
+        setOutput("Your account has been disabled. Please contact your Team Leader.");
+      // ── Alternative Scenario 3.1: invalid credentials ───────────
+      } else if (err?.response?.status === 401) {
+        setOutput("Login failed: Invalid credentials.");
+      } else {
+        setOutput("Network error. Is the backend running?");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Allow Enter key to submit
   const handleKeyDown = (e) => {
     if (e.key === "Enter") login();
   };

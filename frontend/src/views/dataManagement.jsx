@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logo from './components/Logo';
+import dataController from './controllers/dataContoller.js';
+import Logo from '../components/Logo';
 
 const FISCAL_PERIOD_MAP = { 'October':'P1','November':'P2','December':'P3','January':'P4','February':'P5','March':'P6','April':'P7','May':'P8','June':'P9','July':'P10','August':'P11','September':'P12' };
 const FISCAL_MONTHS = ['October','November','December','January','February','March','April','May','June','July','August','September'];
@@ -96,14 +97,7 @@ function calcAging(netDate, targetDate) {
   return { days, agingDays, agingYear };
 }
 
-const API_BASE = 'http://localhost:8000';
-const api = {
-  headers: () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }),
-  get:    (url)       => fetch(`${API_BASE}${url}`, { headers: api.headers() }).then(r => r.json()),
-  post:   (url, body) => fetch(`${API_BASE}${url}`, { method: 'POST',   headers: api.headers(), body: JSON.stringify(body) }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; }),
-  put:    (url, body) => fetch(`${API_BASE}${url}`, { method: 'PUT',    headers: api.headers(), body: JSON.stringify(body) }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; }),
-  delete: (url)       => fetch(`${API_BASE}${url}`, { method: 'DELETE', headers: api.headers() }).then(r => r.json()),
-};
+
 
 const CATEGORIES = [
   { key: 'revenue',  label: 'Revenue & Expenses',  endpoint: '/revenue-expenses' },
@@ -194,7 +188,7 @@ export default function DataManagement() {
 
   const fetchEntries = async () => {
     setLoading(true); setError('');
-    try { const d = await api.get(currentCat.endpoint); setEntries(Array.isArray(d) ? d : []); }
+    try { const d = await controller.get(currentCat.endpoint); setEntries(Array.isArray(d) ? d : []); }
     catch { setError('Failed to load data'); }
     finally { setLoading(false); }
   };
@@ -270,11 +264,11 @@ export default function DataManagement() {
       const { period, createdAt, updatedAt, daysOutstanding, agingDays, agingYear, id, ...payload } = form;
       const final = { ...payload, userId: currentUser?.id ?? 1 };
       if (modalMode === 'create') {
-        await api.post(currentCat.endpoint, final);
+        await controller.post(currentCat.endpoint, final);
         setMessage('Entry created!');
       } else {
         const { userId: _u, ...upd } = final;
-        await api.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
+        await controller.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
         setMessage('Entry updated!');
       }
       setTimeout(() => { setShowModal(false); setMessage(''); fetchEntries(); }, 1200);
@@ -284,7 +278,7 @@ export default function DataManagement() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this entry?')) return;
-    try { await api.delete(`${currentCat.endpoint}/${id}`); fetchEntries(); }
+    try { await controller.delete(`${currentCat.endpoint}/${id}`); fetchEntries(); }
     catch { setError('Failed to delete'); }
   };
 

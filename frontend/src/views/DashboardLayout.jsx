@@ -1,22 +1,5 @@
-/**
- * DashboardLayout.jsx
- *
- * A collapsible sidebar that wraps ALL dashboard pages via React Router's
- * nested <Outlet /> pattern.
- *
- * HOW TO ADD A NEW DASHBOARD:
- *   1. Add one object to the DASHBOARDS array below.
- *   2. Add the route in App.jsx (one line).
- *   Done. The sidebar updates automatically.
- */
-
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ① DASHBOARD REGISTRY — add every dashboard here
-//    icon: any SVG you like. We use inline SVGs so there's no library needed.
-// ─────────────────────────────────────────────────────────────────────────────
 const DASHBOARDS = [
   {
     label: "Profitability",
@@ -67,23 +50,10 @@ const DASHBOARDS = [
     </svg>
   ),
 },
-  // ── Paste future dashboards below this line ────────────────────────────────
-  // {
-  //   label: "Cash Flow",
-  //   path:  "/home/dashboard/cash-flow",
-  //   icon: (
-  //     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  //          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-  //       <circle cx="12" cy="12" r="10" />
-  //       <path d="M12 6v6l4 2" />
-  //     </svg>
-  //   ),
-  // },
+
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ② Colour tokens — keep in sync with your dashboards
-// ─────────────────────────────────────────────────────────────────────────────
+
 const C = {
   navy:       "#092A5E",
   navyDark:   "#061C40",
@@ -102,9 +72,7 @@ const SIDEBAR_WIDE     = 220;   // px when expanded
 const SIDEBAR_NARROW   = 64;    // px when collapsed
 const TRANSITION       = "0.22s cubic-bezier(0.4, 0, 0.2, 1)";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ③ Component
-// ─────────────────────────────────────────────────────────────────────────────
+
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate  = useNavigate();
