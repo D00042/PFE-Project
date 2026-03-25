@@ -1,20 +1,22 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import authController from '../controllers/authController.js'
 
 function Profile() {
-  const [oldPassword, setOldPassword]     = useState("")
-  const [password, setPassword]           = useState("")
+  const [oldPassword, setOldPassword]         = useState("")
+  const [password, setPassword]               = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [status, setStatus]               = useState(null)
+  const [status, setStatus]                   = useState(null)
   const navigate = useNavigate()
 
-  // ── Logout ──────────────────────────────────────────────
+  // ── CONTROLLER CALL: logout ──────────────────────────────────────
   const handleLogout = () => {
     localStorage.removeItem("token")
+    localStorage.removeItem("user")
     navigate("/login")
   }
 
-  // ── Password strength ────────────────────────────────────
+  // ── Password strength ────────────────────────────────────────────
   const getStrength = (pwd) => {
     let score = 0
     if (pwd.length >= 8)            score++
@@ -44,7 +46,7 @@ function Profile() {
     { label: "At least one special character", ok: /[^A-Za-z0-9]/.test(password) },
   ]
 
-  // ── Submit ───────────────────────────────────────────────
+  // ── CONTROLLER CALL: US 1.1 — Change password ───────────────────
   const changePassword = async () => {
     if (!oldPassword) {
       setStatus({ type: "error", message: "Please enter your current password." })
@@ -60,30 +62,18 @@ function Profile() {
     }
 
     try {
-      const token = localStorage.getItem("token")
-      const res = await fetch("http://127.0.0.1:8000/auth/change-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          old_password: oldPassword,
-          new_password: password,
-        }),
+      await authController.changePassword({
+        old_password: oldPassword,
+        new_password: password,
       })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || "Request failed")
-      }
 
       setStatus({ type: "success", message: "Password updated! A confirmation email has been sent to you." })
       setOldPassword("")
       setPassword("")
       setConfirmPassword("")
     } catch (e) {
-      setStatus({ type: "error", message: e.message || "Something went wrong." })
+      const msg = e?.response?.data?.detail || e?.message || "Something went wrong."
+      setStatus({ type: "error", message: msg })
     }
   }
 
@@ -115,7 +105,7 @@ function Profile() {
       <div style={styles.content}>
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Change Password</h2>
-          <p style={styles.cardSub}>You'll receive a confirmation email once updated.</p>
+          <p style={styles.cardSub}>You will receive a confirmation email once updated.</p>
 
           {/* Current password */}
           <div style={styles.field}>

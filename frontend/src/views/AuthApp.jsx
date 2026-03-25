@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import authController from "./controllers/authController.js";
+import authController from "../controllers/authController.js";
 
 function AuthApp() {
   const [email, setEmail] = useState("");
