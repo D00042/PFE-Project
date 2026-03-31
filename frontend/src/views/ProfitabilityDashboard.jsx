@@ -1,19 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import dashboardService from '../services/dashboardService';
 import {
   ComposedChart, BarChart, Bar, Line,
-  PieChart, Pie, Cell as PieCell,
+  LineChart, PieChart, Pie,
   LabelList, XAxis, YAxis, Tooltip,
   Legend, ResponsiveContainer, Cell, ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 
 const API_URL = "http://127.0.0.1:8000";
 
-// ── TUI Brand Palette ────────────────────────────────────────────────────────
 const COLORS = {
   navy:        "#001F5B",
-  blue:        "#1B5EA6",
-  blueLight:   "#A3C4E8",
+  blue:        "#1B5EA6",     
+  blueLight:   "#A3C4E8",     
   red:         "#C8102E",
   teal:        "#007B8A",
   tealLight:   "#7ECCD4",
@@ -42,29 +43,24 @@ const FISCAL_PERIODS = [
 const fmt     = (n) => new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(n);
 const fmtFull = (n) => new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(n);
 
-// ── Shared label styles ───────────────────────────────────────────────────────
-const lbTop      = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
-const lbTopGrey  = { fontSize:8, fill:COLORS.grey,  fontWeight:500 };
-const lbRight    = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
+const lbTop     = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
+const lbTopGrey = { fontSize:8, fill:COLORS.grey,  fontWeight:500 };
+const lbRight   = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
 
-// ── Custom XAxis tick: wraps long labels, no tilt ────────────────────────────
 const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
   const words = String(payload.value).split(" ");
   const lines = [];
-  let current = "";
+  let cur = "";
   for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (test.length > maxChars && current) { lines.push(current); current = word; }
-    else { current = test; }
+    const test = cur ? `${cur} ${word}` : word;
+    if (test.length > maxChars && cur) { lines.push(cur); cur = word; }
+    else { cur = test; }
   }
-  if (current) lines.push(current);
-  const lineHeight = fontSize + 3;
+  if (cur) lines.push(cur);
   return (
     <g transform={`translate(${x},${y + 6})`}>
       {lines.map((line, i) => (
-        <text key={i} x={0} y={i * lineHeight} textAnchor="middle" fill="#374151" fontSize={fontSize}>
-          {line}
-        </text>
+        <text key={i} x={0} y={i * (fontSize + 3)} textAnchor="middle" fill="#374151" fontSize={fontSize}>{line}</text>
       ))}
     </g>
   );
@@ -83,14 +79,25 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
   );
 };
 
-
 const exportPDF = () => window.print();
 
 if (!document.getElementById("prof-print-style")) {
   const s = document.createElement("style");
   s.id = "prof-print-style";
-s.textContent = `@media print { body *{visibility:hidden} #prof-print,#prof-print *{visibility:visible} #prof-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;  document.head.appendChild(s);
+  s.textContent = `@media print { body *{visibility:hidden} #prof-print,#prof-print *{visibility:visible} #prof-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  document.head.appendChild(s);
 }
+
+// ── Overhead category filter options ─────────────────────────────────────────
+const OVERHEAD_CATS = [
+  "All",
+  "Property Costs",
+  "Communication Costs",
+  "Travel And Entertainment",
+  "Office Costs",
+  "Computer Costs",
+  "Professional Fees",
+];
 
 export default function ProfitabilityDashboard() {
   const navigate    = useNavigate();
@@ -100,6 +107,13 @@ export default function ProfitabilityDashboard() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
+  const [interpretation, setInterpretation] = useState("");
+const [loadingAI, setLoadingAI]           = useState(false);
+const [aiError, setAiError]               = useState("");
+
+  // ── Individual chart slicers ──────────────────────────────────────────────
+  const [overheadCat,  setOverheadCat]  = useState("All");   // Overheads filter
+  const [cashFlowType, setCashFlowType] = useState("All");   // Rev vs CF filter: All | positive | negative
 
   useEffect(() => { fetchData(); }, [year, period]);
 
@@ -116,7 +130,40 @@ export default function ProfitabilityDashboard() {
     } catch { setError("Network error."); }
     finally { setLoading(false); }
   };
-
+  const fetchInterpretation = async () => {
+    if (!data) return;
+    setLoadingAI(true);
+    setAiError("");
+    setInterpretation("");
+    try {
+        const { data: result } = await dashboardService
+            .interpretProfitability({
+                year,
+                period,
+                grossMargin:         data.kpis.grossMargin?.current      ?? 0,
+                grossMarginPrev:     data.kpis.grossMargin?.previous     ?? 0,
+                ebitMargin:          data.kpis.ebitMargin?.current       ?? 0,
+                ebitMarginPrev:      data.kpis.ebitMargin?.previous      ?? 0,
+                netProfitMargin:     data.kpis.netProfitMargin?.current  ?? 0,
+                netProfitMarginPrev: data.kpis.netProfitMargin?.previous ?? 0,
+                roa:                 data.kpis.roa?.current              ?? 0,
+                roaPrev:             data.kpis.roa?.previous             ?? 0,
+                roe:                 data.kpis.roe?.current              ?? 0,
+                roePrev:             data.kpis.roe?.previous             ?? 0,
+                totalRevenue:        data.kpis.totalRevenue?.current     ?? 0,
+                totalRevenuePrev:    data.kpis.totalRevenue?.previous    ?? 0,
+                // Chart data
+                plSummary:    data.plSummary    ?? [],
+                monthlyTrend: data.monthlyTrend ?? [],
+            });
+        setInterpretation(result.interpretation);
+    } catch {
+        setAiError("Failed to generate interpretation. Please try again.");
+    } finally {
+        setLoadingAI(false);
+    }
+};
+  // ── Waterfall (now column + line) ─────────────────────────────────────────
   const waterfallData = useMemo(() => {
     if (!data) return [];
     const pl  = data.plSummary;
@@ -134,11 +181,10 @@ export default function ProfitabilityDashboard() {
     return steps.map((s) => {
       if (s.type === "total") {
         running = s.value;
-        return { ...s, base:0, bar:s.value, fill:COLORS.total, cumulative:running };
+        return { ...s, bar: s.value, fill: COLORS.total, cumulative: running };
       }
-      const base = running;
       running += s.value;
-      return { ...s, base, bar:Math.abs(s.value), fill:s.value >= 0 ? COLORS.positive : COLORS.negative, cumulative:running };
+      return { ...s, bar: Math.abs(s.value), fill: s.value >= 0 ? COLORS.positive : COLORS.negative, cumulative: running };
     });
   }, [data]);
 
@@ -151,6 +197,26 @@ export default function ProfitabilityDashboard() {
     ];
   }, [data]);
 
+  // ── Overheads sorted descending + filtered ────────────────────────────────
+  const sortedOverheads = useMemo(() => {
+    if (!data) return [];
+    const base = overheadCat === "All"
+      ? data.overheadsDetail
+      : data.overheadsDetail.filter(d => d.category === overheadCat);
+    return [...base].sort((a, b) => b.current - a.current);
+  }, [data, overheadCat]);
+
+  // ── Revenue vs Cash Flow data ─────────────────────────────────────────────
+  const revVsCFData = useMemo(() => {
+    if (!data?.monthlyTrend) return [];
+    return data.monthlyTrend.map(m => ({
+      month:   m.month,
+      revenue: m.revenue,
+      // operating CF approximated as ebit + non-cash (ebit as proxy if no CF data)
+      operatingCF: m.ebit ?? 0,
+    }));
+  }, [data]);
+
   if (loading) return (
     <div style={S.page}><div style={S.loadingBox}><div style={S.spinner}/>
       <p style={{ color:COLORS.navy, marginTop:16, fontWeight:600 }}>Loading Dashboard...</p>
@@ -159,7 +225,7 @@ export default function ProfitabilityDashboard() {
   if (error) return <div style={S.page}><p style={{ color:COLORS.red, textAlign:"center", marginTop:100 }}>{error}</p></div>;
   if (!data) return null;
 
-  const { kpis, plSummary, overheadsDetail, monthlyTrend, expensesBreakdown } = data;
+  const { kpis, plSummary, monthlyTrend, expensesBreakdown } = data;
 
   const kpiCards = [
     { label:"Gross Profit Margin", key:"grossMargin",     unit:"%",
@@ -177,7 +243,7 @@ export default function ProfitabilityDashboard() {
   return (
     <div style={S.page} id="prof-print">
 
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Profitability Dashboard</h1>
@@ -187,7 +253,7 @@ export default function ProfitabilityDashboard() {
         </div>
       </div>
 
-      {/* Controls */}
+      {/* ── Controls ── */}
       <div style={S.controlBar}>
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
@@ -205,7 +271,7 @@ export default function ProfitabilityDashboard() {
         <span style={S.currencyLabel}>Values in EUR</span>
       </div>
 
-      {/* KPI Cards */}
+      {/* ── KPI Cards ── */}
       <div style={S.kpiRow}>
         {kpiCards.map(({ label, key, unit, icon }) => {
           const curr = kpis[key]?.current  ?? 0;
@@ -221,49 +287,107 @@ export default function ProfitabilityDashboard() {
               <p style={S.kpiRowLabel}>Previous</p>
               <p style={{ ...S.kpiValueSm, color:COLORS.grey }}>{prev.toFixed(1)}{unit}</p>
               <div style={{ marginTop:6, fontSize:10, fontWeight:700, color: up ? COLORS.green : COLORS.red }}>
-                {up ? "▲" : "▼"} {Math.abs(curr - prev).toFixed(1)}pp vs prev
+                {up ? "▲" : "▼"} {Math.abs(curr - prev).toFixed(1)}% vs prev
               </div>
             </div>
           );
         })}
       </div>
+{/* AI Interpretation Panel */}
+<div style={S.aiPanel}>
+    <div style={S.aiPanelHeader}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <img 
+    src="/statistical-analysis.png" 
+    alt="AI" 
+    style={{ width: 24, height: 24 }}
+/>
+            <p style={S.aiPanelTitle}>AI Interpretation</p>
+        </div>
+        <button
+            style={{
+                ...S.aiBtn,
+                opacity: loadingAI ? 0.6 : 1,
+                cursor:  loadingAI ? "wait" : "pointer",
+            }}
+            onClick={fetchInterpretation}
+            disabled={loadingAI || !data}
+        >
+            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
+        </button>
+    </div>
 
-      {/* Row 1 */}
+    {aiError && (
+        <p style={S.aiError}>{aiError}</p>
+    )}
+
+    {!interpretation && !loadingAI && !aiError && (
+        <p style={S.aiPlaceholder}>
+            Click "Generate Interpretation" to get an AI-powered 
+            analysis of the current dashboard metrics.
+        </p>
+    )}
+
+    {loadingAI && (
+        <div style={{ display:"flex", alignItems:"center", 
+                      gap:10, padding:"12px 0" }}>
+            <div style={S.aiSpinner}/>
+            <p style={{ color:COLORS.grey, fontSize:13 }}>
+                Analyzing your financial data...
+            </p>
+        </div>
+    )}
+
+    {interpretation && (
+        <p style={S.aiText}>{interpretation}</p>
+    )}
+</div>
+      {/* ── Row 1: P&L Summary + Overheads ── */}
       <div style={S.row2}>
 
-        {/* P&L Summary */}
+        {/* P&L Summary — dark blue current, light blue previous */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Profit &amp; Loss Summary</p>
           <div style={S.legendRow}>
-            <span style={S.dot(COLORS.teal)}/><span style={S.legendText}>Current Year</span>
-            <span style={S.dot(COLORS.tealLight)}/><span style={S.legendText}>Previous Year</span>
+            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Current Year</span>
+            <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
           </div>
           <ResponsiveContainer width="100%" height={360}>
             <BarChart data={plSummary} margin={{ bottom:8, left:8, right:8, top:22 }}>
               <XAxis dataKey="label" interval={0} height={52} tick={<WrappedTick maxChars={9} fontSize={9}/>}/>
               <YAxis tick={{ fontSize:10 }} tickFormatter={fmt}/>
               <Tooltip formatter={(v) => fmtFull(v)}/>
-              <Bar dataKey="current"  name="Current Year"  fill={COLORS.teal}      radius={[4,4,0,0]}>
+              <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
                 <LabelList dataKey="current"  position="top" formatter={fmt} style={lbTop}/>
               </Bar>
-              <Bar dataKey="previous" name="Previous Year" fill={COLORS.tealLight} radius={[4,4,0,0]}>
+              <Bar dataKey="previous" name="Previous Year" fill={COLORS.blueLight} radius={[4,4,0,0]}>
                 <LabelList dataKey="previous" position="top" formatter={fmt} style={lbTopGrey}/>
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Other Overheads — horizontal */}
+        {/* Overheads — sorted descending, with category slicer */}
         <div style={S.chartCard}>
-          <p style={S.chartTitle}>Other Overheads Details</p>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <p style={{ ...S.chartTitle, margin:0 }}>Other Overheads Details</p>
+            {/* ── Slicer: filter by category ── */}
+            <select
+              value={overheadCat}
+              onChange={e => setOverheadCat(e.target.value)}
+              style={S.slicerSelect}
+            >
+              {OVERHEAD_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
           <div style={S.legendRow}>
             <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Current Year</span>
             <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
           </div>
           <ResponsiveContainer width="100%" height={360}>
-            <BarChart data={overheadsDetail} layout="vertical" margin={{ left:4, right:52, top:8, bottom:8 }}>
+            <BarChart data={sortedOverheads} layout="vertical" margin={{ left:4, right:52, top:8, bottom:8 }}>
               <XAxis type="number" tick={{ fontSize:10 }} tickFormatter={fmt}/>
-              <YAxis type="category" dataKey="category" tick={{ fontSize:11 }} width={165}/>
+              <YAxis type="category" dataKey="category" tick={{ fontSize:10 }} width={170}/>
               <Tooltip formatter={(v) => fmtFull(v)}/>
               <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[0,3,3,0]}>
                 <LabelList dataKey="current"  position="right" formatter={fmt} style={lbRight}/>
@@ -274,13 +398,12 @@ export default function ProfitabilityDashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
       </div>
 
-      {/* Row 2 */}
+      {/* ── Row 2: Waterfall (column + line) + Expenses Pie ── */}
       <div style={S.row2}>
 
-        {/* Waterfall */}
+        {/* P&L Waterfall — column bars + cumulative line */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>P&amp;L Waterfall — Revenue to EBIT</p>
           <div style={S.legendRow}>
@@ -292,21 +415,29 @@ export default function ProfitabilityDashboard() {
           </div>
           <ResponsiveContainer width="100%" height={360}>
             <ComposedChart data={waterfallData} margin={{ bottom:8, top:22, left:8, right:8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
               <XAxis dataKey="name" interval={0} height={48} tick={<WrappedTick maxChars={8} fontSize={9}/>}/>
               <YAxis tick={{ fontSize:10 }} tickFormatter={fmt}/>
               <Tooltip formatter={(v, name, props) => {
                 if (name === "Running Total") return [fmtFull(v), "Running Total"];
-                return [fmtFull(props.payload.value), props.payload.name];
+                return [fmtFull(props.payload.value ?? v), props.payload.name];
               }}/>
               <ReferenceLine y={0} stroke="#CBD5E1"/>
-              <Bar dataKey="base" stackId="wf" fill="transparent" legendType="none"/>
-              <Bar dataKey="bar"  stackId="wf" radius={[4,4,0,0]}>
+              {/* Column bars — each colored by fill property */}
+              <Bar dataKey="bar" name="Amount" radius={[4,4,0,0]}>
                 <LabelList dataKey="bar" position="top" formatter={fmt} style={{ fontSize:9, fontWeight:600, fill:COLORS.navy }}/>
                 {waterfallData.map((e, i) => <Cell key={i} fill={e.fill}/>)}
               </Bar>
-              <Line type="monotone" dataKey="cumulative" name="Running Total"
-                stroke={COLORS.amber} strokeWidth={2.5} strokeDasharray="5 3"
-                dot={{ r:5, fill:COLORS.amber, strokeWidth:0 }} activeDot={{ r:7 }}
+              {/* Cumulative line on top */}
+              <Line
+                type="monotone"
+                dataKey="cumulative"
+                name="Running Total"
+                stroke={COLORS.amber}
+                strokeWidth={2.5}
+                strokeDasharray="5 3"
+                dot={{ r:5, fill:COLORS.amber, strokeWidth:0 }}
+                activeDot={{ r:7 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -317,26 +448,25 @@ export default function ProfitabilityDashboard() {
           <p style={S.chartTitle}>Expenses Distribution</p>
           <ResponsiveContainer width="100%" height={360}>
             <PieChart>
-              <Pie data={expensesBreakdown} cx="50%" cy="50%" outerRadius={120}
-                dataKey="value" labelLine={false} label={renderPieLabel}>
-                {(expensesBreakdown ?? []).map((_, i) => <PieCell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]}/>)}
+              <Pie data={expensesBreakdown ?? []} cx="50%" cy="50%" outerRadius={120}
+                dataKey="value" nameKey="name" labelLine={false} label={renderPieLabel}>
+                {(expensesBreakdown ?? []).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]}/>)}
               </Pie>
               <Tooltip formatter={(v) => fmtFull(v)}/>
               <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize:11 }}/>
             </PieChart>
           </ResponsiveContainer>
         </div>
-
       </div>
 
-      {/* Row 3 */}
+      {/* ── Row 3: Margins + Revenue vs Cash Flow (NEW) ── */}
       <div style={S.row2}>
 
-        {/* Margins */}
+        {/* Margins — dark blue current, light blue previous */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Profitability Margins — Current vs Previous</p>
           <div style={S.legendRow}>
-            <span style={S.dot(COLORS.navy)}/><span style={S.legendText}>Current Year</span>
+            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Current Year</span>
             <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -345,13 +475,86 @@ export default function ProfitabilityDashboard() {
               <YAxis tick={{ fontSize:11 }} tickFormatter={(v) => `${v}%`}/>
               <Tooltip formatter={(v) => [`${v.toFixed(1)}%`]}/>
               <ReferenceLine y={0} stroke="#CBD5E1"/>
-              <Bar dataKey="current"  name="Current Year"  fill={COLORS.navy}      radius={[4,4,0,0]}>
+              <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
                 <LabelList dataKey="current"  position="top" formatter={(v) => `${v.toFixed(1)}%`} style={{ fontSize:9, fill:COLORS.navy, fontWeight:700 }}/>
               </Bar>
               <Bar dataKey="previous" name="Previous Year" fill={COLORS.blueLight} radius={[4,4,0,0]}>
                 <LabelList dataKey="previous" position="top" formatter={(v) => `${v.toFixed(1)}%`} style={{ fontSize:9, fill:COLORS.grey }}/>
               </Bar>
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Revenue vs Cash Flow — NEW dual line chart */}
+        <div style={S.chartCard}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+            <div>
+              <p style={{ ...S.chartTitle, margin:0 }}>Revenue vs Operating Cash Flow</p>
+              <p style={S.chartSub}>Detect cash conversion problems</p>
+            </div>
+            {/* ── Slicer: highlight gap months ── */}
+            <select
+              value={cashFlowType}
+              onChange={e => setCashFlowType(e.target.value)}
+              style={S.slicerSelect}
+            >
+              <option value="All">All months</option>
+              <option value="positive">CF Positive only</option>
+              <option value="negative">CF Negative only</option>
+            </select>
+          </div>
+          <div style={S.legendRow}>
+            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Revenue</span>
+            <span style={S.dot(COLORS.teal)}/><span style={S.legendText}>Operating Cash Flow (EBIT proxy)</span>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart
+              data={cashFlowType === "All" ? revVsCFData :
+                revVsCFData.filter(d => cashFlowType === "positive" ? d.operatingCF >= 0 : d.operatingCF < 0)}
+              margin={{ top:22, right:16, left:8, bottom:8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
+              <XAxis dataKey="month" tick={{ fontSize:10 }}/>
+              <YAxis tick={{ fontSize:10 }} tickFormatter={fmt} width={52}/>
+              <Tooltip formatter={(v, name) => [fmtFull(v), name]}
+                contentStyle={{ borderRadius:8, border:"none", boxShadow:"0 4px 16px rgba(0,0,0,0.1)", fontSize:12 }}/>
+              <ReferenceLine y={0} stroke="#CBD5E1" strokeDasharray="4 2"/>
+              <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize:11 }}/>
+              <Line type="monotone" dataKey="revenue"     name="Revenue"    stroke={COLORS.blue} strokeWidth={2.5} dot={{ r:4 }} activeDot={{ r:6 }}/>
+              <Line type="monotone" dataKey="operatingCF" name="Operating CF" stroke={COLORS.teal} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r:4 }} activeDot={{ r:6 }}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Row 4: Monthly Trend (revenue bar removed) + Revenue vs Budget ── */}
+      <div style={S.row2}>
+
+        {/* Monthly Trend — revenue line removed, revenue bar kept for reference */}
+        <div style={S.chartCard}>
+          <p style={S.chartTitle}>
+            Monthly EBIT &amp; Expense Trend
+            {period !== "P12" && <span style={{ fontSize:11, fontWeight:400, color:COLORS.grey, marginLeft:8 }}>(P1 – {period})</span>}
+          </p>
+          <div style={S.legendRow}>
+            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Revenue (bars)</span>
+            <span style={S.dot(COLORS.red)}/><span style={S.legendText}>EBIT</span>
+            <span style={S.dot(COLORS.grey)}/><span style={S.legendText}>Expenses</span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={monthlyTrend} margin={{ bottom:8, left:8, right:16, top:22 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
+              <XAxis dataKey="month" interval={0} height={36} tick={<WrappedTick maxChars={12} fontSize={9}/>}/>
+              <YAxis tick={{ fontSize:11 }} tickFormatter={fmt}/>
+              <Tooltip formatter={(v, name) => [fmtFull(v), name]}/>
+              <ReferenceLine y={0} stroke="#CBD5E1" strokeDasharray="4 2"/>
+              <Bar yAxisId={undefined} dataKey="revenue" name="Revenue" fill={COLORS.blueLight} radius={[3,3,0,0]} opacity={0.4}>
+                <LabelList dataKey="revenue" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.blue, fontWeight:600 }}/>
+              </Bar>
+              {/* Revenue LINE removed as requested */}
+              <Line type="monotone" dataKey="ebit"     name="EBIT"     stroke={COLORS.red}  strokeWidth={2} dot={{ r:3 }}/>
+              <Line type="monotone" dataKey="expenses" name="Expenses" stroke={COLORS.grey} strokeWidth={2} strokeDasharray="4 3" dot={{ r:3 }}/>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
 
@@ -376,65 +579,37 @@ export default function ProfitabilityDashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
       </div>
 
-      {/* Row 4: Monthly Trend */}
-      <div style={{ padding:"0 28px", marginBottom:16 }}>
-        <div style={S.chartCard}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-            <p style={S.chartTitle}>
-              Monthly Revenue, EBIT &amp; Expense Trend
-              {period !== "P12" && <span style={{ fontSize:11, fontWeight:400, color:COLORS.grey, marginLeft:8 }}>(P1 – {period})</span>}
-            </p>
-           
-          </div>
-          <div style={S.legendRow}>
-            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Revenue</span>
-            <span style={S.dot(COLORS.red)}/><span style={S.legendText}>EBIT</span>
-            <span style={S.dot(COLORS.grey)}/><span style={S.legendText}>Expenses</span>
-            <span style={{ display:"inline-block", width:16, height:2, background:COLORS.teal, verticalAlign:"middle", marginRight:4 }}/>
-            <span style={S.legendText}>Growth % →</span>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={monthlyTrend} margin={{ bottom:8, left:8, right:16, top:22 }}>
-              <XAxis dataKey="month" interval={0} height={36} tick={<WrappedTick maxChars={12} fontSize={9}/>}/>
-              <YAxis yAxisId="left"  tick={{ fontSize:11 }} tickFormatter={fmt}/>
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize:10 }} tickFormatter={(v) => `${v}%`}/>
-              <Tooltip formatter={(v, name) => name === "Growth %" ? [`${v}%`, name] : [fmtFull(v), name]}/>
-              <ReferenceLine yAxisId="right" y={0} stroke="#E5E7EB" strokeDasharray="4 2"/>
-              {/* bar gets labels; lines speak for themselves via dots */}
-              <Bar   yAxisId="left" dataKey="revenue" name="Revenue" fill={COLORS.blueLight} radius={[3,3,0,0]} opacity={0.4}>
-                <LabelList dataKey="revenue" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.blue, fontWeight:600 }}/>
-              </Bar>
-              <Line yAxisId="left"  dataKey="revenue"       name="Revenue"  stroke={COLORS.blue}  strokeWidth={2} dot={{ r:3 }}/>
-              <Line yAxisId="left"  dataKey="ebit"          name="EBIT"     stroke={COLORS.red}   strokeWidth={2} dot={{ r:3 }}/>
-              <Line yAxisId="left"  dataKey="expenses"      name="Expenses" stroke={COLORS.grey}  strokeWidth={2} strokeDasharray="4 3" dot={{ r:3 }}/>
-              <Line yAxisId="right" dataKey="revenueGrowth" name="Growth %" stroke={COLORS.teal}  strokeWidth={1.5} strokeDasharray="3 2" dot={{ r:3 }}/>
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Row 5: Stacked Bar */}
+      {/* ── Row 5: Expense vs Net Profit (FIXED) ── */}
       <div style={{ padding:"0 28px", marginBottom:24 }}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Expense vs Net Profit by Month</p>
+          <p style={S.chartSub}>Stacked view: expenses base + net profit on top</p>
           <div style={S.legendRow}>
             <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Expenses</span>
-            <span style={S.dot(COLORS.green)}/><span style={S.legendText}>Net Profit</span>
+            <span style={S.dot(COLORS.green)}/><span style={S.legendText}>Net Profit (Retained)</span>
           </div>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={monthlyTrend} margin={{ bottom:8, left:8, right:8, top:22 }}>
+            {/* Use ComposedChart so we can have separate bars (not stacked) clearly */}
+            <ComposedChart
+              data={monthlyTrend.map(m => ({
+                ...m,
+                // retained can be negative — keep as-is so it shows correctly
+                retainedDisplay: m.retained ?? 0,
+              }))}
+              margin={{ bottom:8, left:8, right:8, top:22 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
               <XAxis dataKey="month" interval={0} height={36} tick={<WrappedTick maxChars={12} fontSize={9}/>}/>
               <YAxis tick={{ fontSize:10 }} tickFormatter={fmt}/>
-              <Tooltip formatter={(v) => fmtFull(v)}/>
-              <Bar dataKey="expenses" name="Expenses"   fill={COLORS.blueLight} stackId="ep"/>
-              <Bar dataKey="retained" name="Net Profit" fill={COLORS.green}     stackId="ep" radius={[4,4,0,0]}>
-                {/* label on top segment shows total stack height */}
-                <LabelList dataKey="retained" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.green, fontWeight:600 }}/>
+              <Tooltip formatter={(v, name) => [fmtFull(v), name]}/>
+              <ReferenceLine y={0} stroke="#CBD5E1"/>
+              <Bar dataKey="expenses"       name="Expenses"   fill={COLORS.blueLight} radius={[4,4,0,0]}/>
+              <Bar dataKey="retainedDisplay" name="Net Profit" fill={COLORS.green}     radius={[4,4,0,0]}>
+                <LabelList dataKey="retainedDisplay" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.green, fontWeight:600 }}/>
               </Bar>
-            </BarChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -450,7 +625,6 @@ const S = {
   pageTitle:     { flex:1, textAlign:"center", color:COLORS.navy, fontSize:22, fontWeight:800, margin:0 },
   logo:          { height:32, marginLeft:12 },
   exportBtn:     { padding:"6px 14px", borderRadius:8, border:`1px solid ${COLORS.navy}`, background:"white", cursor:"pointer", fontSize:12, fontWeight:700, color:COLORS.navy, fontFamily:"Arial,sans-serif" },
-  miniBtn:       { padding:"4px 10px", borderRadius:6, border:"1px solid #CBD5E1", background:"white", cursor:"pointer", fontSize:11, color:COLORS.navy, fontFamily:"Arial,sans-serif", flexShrink:0 },
   controlBar:    { display:"flex", alignItems:"center", flexWrap:"wrap", padding:"10px 28px", gap:12, background:"white", borderBottom:"1px solid #E5E7EB" },
   yearTabs:      { display:"flex", gap:4 },
   yearTab:       { padding:"6px 18px", borderRadius:6, border:"1px solid #CBD5E1", background:"white", cursor:"pointer", fontSize:13, fontFamily:"Arial,sans-serif", color:"#374151" },
@@ -470,9 +644,67 @@ const S = {
   row2:          { display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, padding:"0 28px 16px" },
   chartCard:     { background:"white", borderRadius:16, padding:"20px 24px", boxShadow:"0 2px 12px rgba(0,31,91,0.08)" },
   chartTitle:    { color:COLORS.navy, fontSize:14, fontWeight:700, margin:"0 0 4px" },
+  chartSub:      { color:COLORS.grey, fontSize:11, margin:"0 0 10px" },
   legendRow:     { display:"flex", alignItems:"center", gap:8, marginBottom:12, fontSize:11, flexWrap:"wrap" },
   dot:           (c) => ({ width:10, height:10, borderRadius:"50%", background:c, display:"inline-block", flexShrink:0 }),
   legendText:    { color:"#374151", marginRight:8 },
   loadingBox:    { display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh" },
   spinner:       { width:40, height:40, border:"4px solid #E5E7EB", borderTop:`4px solid ${COLORS.navy}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" },
+  slicerSelect:  { padding:"4px 10px", borderRadius:8, border:"1px solid #CBD5E1", fontSize:11, color:COLORS.navy, background:"white", cursor:"pointer", fontFamily:"Arial,sans-serif", outline:"none" },
+  aiPanel: {
+    margin: "0 28px 16px",
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: "20px 24px",
+    boxShadow: "0 2px 12px rgba(0,31,91,0.08)",
+    borderLeft: `4px solid ${COLORS.navy}`,
+},
+aiPanelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+},
+aiPanelTitle: {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 700,
+    color: COLORS.navy,
+},
+aiBtn: {
+    padding: "8px 18px",
+    backgroundColor: COLORS.navy,
+    color: "white",
+    border: "none",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "Arial, sans-serif",
+},
+aiText: {
+    margin: 0,
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 1.7,
+},
+aiPlaceholder: {
+    margin: 0,
+    fontSize: 13,
+    color: COLORS.grey,
+    fontStyle: "italic",
+},
+aiError: {
+    margin: 0,
+    fontSize: 13,
+    color: COLORS.red,
+},
+aiSpinner: {
+    width: 18,
+    height: 18,
+    border: "3px solid #E5E7EB",
+    borderTop: `3px solid ${COLORS.navy}`,
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+    flexShrink: 0,
+},
 };

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import authController from '../controllers/authController.js'
+import authService from '../services/authService'
 
 function Profile() {
   const [oldPassword, setOldPassword]         = useState("")
@@ -62,7 +62,7 @@ function Profile() {
     }
 
     try {
-      await authController.changePassword({
+      await authService.changePassword({
         old_password: oldPassword,
         new_password: password,
       })

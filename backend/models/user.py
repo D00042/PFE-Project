@@ -10,6 +10,7 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+
     id              = Column(Integer, primary_key=True, index=True)
     email           = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
@@ -18,5 +19,10 @@ class User(Base):
     fullName        = Column(String, nullable=True)
     telephone       = Column(String, nullable=True)
     team            = Column(String, nullable=True)
-    # inside class User:
-    dashboard_permissions = relationship("DashboardPermission", back_populates="user", uselist=False)
+
+    dashboard_permissions = relationship(
+        "DashboardPermission",
+        foreign_keys="DashboardPermission.user_id",
+        back_populates="user",
+        uselist=False
+    )
