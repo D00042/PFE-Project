@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import accountController from '../controllers/accountController.js';
+import accountService from '../services/accountService';
 
 const TEAMS = ['Record-to-Report', 'Purchase-to-Pay', 'Order-to-Cash'];
 
@@ -30,7 +30,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     setLoading(true); setError('');
     try {
-      const { data } = await accountController.getAllUsers();
+      const { data } = await accountService.getAllUsers();
       setUsers(Array.isArray(data) ? data : []);
     } catch {
       setError('Failed to load users');
@@ -81,13 +81,13 @@ export default function UserManagement() {
     try {
       if (modalMode === 'create') {
         // ── CONTROLLER CALL: US 1.2.1 — Create employee account ───
-        await accountController.createAccount(form);
+        await accountService.createAccount(form);
         setMessage(`Account created! Credentials sent to ${form.email}.`);
       } else {
         // ── CONTROLLER CALL: US 1.2.3 — Edit employee account ─────
         // Note: email and password excluded — read-only per use case spec
         const { password: _p, email: _e, ...updateData } = form;
-        await accountController.editAccount(selectedUser.id, updateData);
+        await accountService.editAccount(selectedUser.id, updateData);
         setMessage('Account updated successfully!');
       }
       setTimeout(() => { setShowModal(false); setMessage(''); fetchUsers(); }, 1600);
@@ -103,10 +103,10 @@ export default function UserManagement() {
     try {
       if (isActive) {
         // ── CONTROLLER CALL: US 1.2.2 — Deactivate account ────────
-        await accountController.deactivateAccount(id);
+        await accountService.deactivateAccount(id);
       } else {
         // ── CONTROLLER CALL: US 1.2.2 — Activate account ──────────
-        await accountController.activateAccount(id);
+        await accountService.activateAccount(id);
       }
       setMessage(`Account ${isActive ? 'deactivated' : 'activated'}!`);
       fetchUsers();

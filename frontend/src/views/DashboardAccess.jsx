@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import accessController from '../controllers/accessController.js'
+import accessService from "../services/accessService";
 
 const DASHBOARDS = [
   { key: "profitability", label: "Profitability" },
@@ -18,7 +18,7 @@ export default function DashboardAccess() {
 
   useEffect(() => {
     // ── CONTROLLER CALL: US 1.5.3 — View all leaders with permissions ──
-    accessController.getAllLeadersWithPermissions()
+    accessService.getAllLeadersWithPermissions()
       .then(({ data }) => { setLeaders(data); setLoading(false) })
       .catch(() => { showToast("Failed to load data.", "error"); setLoading(false) })
   }, [])
@@ -37,7 +37,7 @@ export default function DashboardAccess() {
 
     try {
       // ── CONTROLLER CALL: US 1.5.1 / 1.5.2 — Grant or revoke access ──
-      const { data } = await accessController.toggleDashboardAccess(userId, dashboard, enabled)
+      const { data } = await accessService.toggleDashboardAccess(userId, dashboard, enabled)
       showToast(data.message, "success")
     } catch {
       // Revert on failure

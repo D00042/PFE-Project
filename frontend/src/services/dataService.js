@@ -1,14 +1,10 @@
-/**
- * dataController.js
- * User Stories 1.3 & 1.4 — Manage Financial Data
- * Handles: Revenue & Expenses, Assets & Liabilities, Cash Flow, Clients
- */
+
 
 import { API_BASE_URL, getAuthHeaders, handleResponse } from './apiUtils.js';
 
-const dataController = {
+const dataService = {
 
-  // ── REVENUE & EXPENSES ──────────────────────────────────────────────────────
+
 
   createRevenueExpense: async (data) => {
     const response = await fetch(`${API_BASE_URL}/revenue-expenses`, {
@@ -43,7 +39,7 @@ const dataController = {
     return handleResponse(response);
   },
 
-  // ── ASSETS & LIABILITIES ────────────────────────────────────────────────────
+
 
   createAssetLiability: async (data) => {
     const response = await fetch(`${API_BASE_URL}/asset-liabilities`, {
@@ -78,7 +74,6 @@ const dataController = {
     return handleResponse(response);
   },
 
-  // ── CASH FLOW ───────────────────────────────────────────────────────────────
 
   createCashFlow: async (data) => {
     const response = await fetch(`${API_BASE_URL}/cash-flows`, {
@@ -113,7 +108,6 @@ const dataController = {
     return handleResponse(response);
   },
 
-  // ── CLIENTS (Suppliers & Customers) ─────────────────────────────────────────
 
   createClient: async (data) => {
     const response = await fetch(`${API_BASE_URL}/clients`, {
@@ -148,7 +142,6 @@ const dataController = {
     return handleResponse(response);
   },
 
-  // ── Generic methods used by dataManagement.jsx ─────────────────────────────
 
   get: async (endpoint) => {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -185,4 +178,4 @@ const dataController = {
   },
 };
 
-export default dataController;
+export default dataService;

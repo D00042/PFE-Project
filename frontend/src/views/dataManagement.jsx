@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import dataController from '../controllers/dataController.js';
+import dataService from '../services/dataService.js';
 import Logo from '../components/Logo.jsx';
 
 const FISCAL_PERIOD_MAP = { 'October':'P1','November':'P2','December':'P3','January':'P4','February':'P5','March':'P6','April':'P7','May':'P8','June':'P9','July':'P10','August':'P11','September':'P12' };
@@ -186,7 +186,7 @@ export default function DataManagement() {
   const fetchEntries = async () => {
     setLoading(true); setError('');
     try {
-      const data = await dataController.get(currentCat.endpoint);
+      const data = await dataService.get(currentCat.endpoint);
       setEntries(Array.isArray(data) ? data : []);
     } catch {
       setError('Failed to load data');
@@ -266,11 +266,11 @@ export default function DataManagement() {
       const { period, createdAt, updatedAt, daysOutstanding, agingDays, agingYear, id, ...payload } = form;
       const final = { ...payload, userId: currentUser?.id ?? 1 };
       if (modalMode === 'create') {
-        await dataController.post(currentCat.endpoint, final);
+        await dataService.post(currentCat.endpoint, final);
         setMessage('Entry created!');
       } else {
         const { userId: _u, ...upd } = final;
-        await dataController.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
+        await dataService.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
         setMessage('Entry updated!');
       }
       setTimeout(() => { setShowModal(false); setMessage(''); fetchEntries(); }, 1200);
@@ -285,7 +285,7 @@ export default function DataManagement() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this entry?')) return;
     try {
-      await dataController.delete(`${currentCat.endpoint}/${id}`);
+      await dataService.delete(`${currentCat.endpoint}/${id}`);
       fetchEntries();
     } catch {
       setError('Failed to delete');

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import authController from "../controllers/authController.js";
+import authService from "../services/authService";
 
 function AuthApp() {
   const [email, setEmail] = useState("");
@@ -23,12 +23,12 @@ function AuthApp() {
     setOutput("");
     try {
       // ── CONTROLLER CALL: US 1.1 Basic Scenario ──────────────────
-      const { data } = await authController.login({ email, password });
+      const { data } = await authService.login({ email, password });
 
       localStorage.setItem("token", data.access_token);
 
       // ── CONTROLLER CALL: US 1.1 — fetch role after login ────────
-      const { data: meData } = await authController.getProfile();
+      const { data: meData } = await authService.getProfile();
       const userData = { id: meData.id, email: meData.email, role: meData.role };
       localStorage.setItem("user", JSON.stringify(userData));
 

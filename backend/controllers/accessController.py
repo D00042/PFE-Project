@@ -5,7 +5,8 @@ from models.user import User, UserRole
 from models.dashboard_permission import DashboardPermission
 from core.dependencies import require_roles
 from pydantic import BaseModel
-from core.email import send_dashboard_access_email 
+from core.email import send_dashboard_access_email
+
 router = APIRouter(prefix="/dashboard-access", tags=["dashboard-access"])
 
 VALID_DASHBOARDS = {"profitability", "balance_sheet", "liquidity", "dpo_dso"}
@@ -16,7 +17,6 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
-# ── GET all leaders with their permissions ──────────────────
 @router.get("/leaders")
 def get_leaders_with_permissions(
     db: Session = Depends(get_db),
@@ -29,7 +29,6 @@ def get_leaders_with_permissions(
 
     result = []
     for leader in leaders:
-        # Auto-create permission row if it doesn't exist yet
         perm = leader.dashboard_permissions
         if not perm:
             perm = DashboardPermission(user_id=leader.id)
@@ -38,10 +37,14 @@ def get_leaders_with_permissions(
             db.refresh(perm)
 
         result.append({
-            "id":           leader.id,
-            "email":        leader.email,
-            "fullName":     leader.fullName,
-            "team":         leader.team,
+            "id":        leader.id,
+            "email":     leader.email,
+            "fullName":  leader.fullName,
+            "team":      leader.team,
+            "accessId":  perm.id,
+            "grantedBy": perm.granted_by,
+            "grantedAt": perm.granted_at.isoformat() if perm.granted_at else None,
+            "isGranted": perm.is_granted,
             "permissions": {
                 "profitability": perm.profitability,
                 "balance_sheet": perm.balance_sheet,
@@ -53,7 +56,6 @@ def get_leaders_with_permissions(
     return result
 
 
-# ── PATCH toggle a single dashboard for a leader ───────────
 @router.patch("/leaders/{user_id}")
 def toggle_dashboard(
     user_id: int,
@@ -74,6 +76,10 @@ def toggle_dashboard(
         db.add(perm)
 
     setattr(perm, body.dashboard, body.enabled)
+
+    if body.enabled:
+        perm.granted_by = current_user.id
+
     db.commit()
 
     if body.enabled:

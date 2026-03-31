@@ -12,208 +12,6 @@ from core.dependencies import get_current_user
 from models.user import User
 router = APIRouter(tags=["data"])
 
-FISCAL_PERIOD_MAP = {
-    "October": "P1", "November": "P2", "December": "P3",
-    "January": "P4", "February": "P5", "March": "P6",
-    "April": "P7", "May": "P8", "June": "P9",
-    "July": "P10", "August": "P11", "September": "P12"
-}
-
-def get_period(month: str) -> str:
-    return FISCAL_PERIOD_MAP.get(month, "P1")
-
-# REVENUE & EXPENSES
-
-@router.post("/revenue-expenses", response_model=RevenueExpenseOut, status_code=201)
-def create_revenue_expense(entry: RevenueExpenseCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
-    data["period"] = get_period(data["month"])
-    if data.get("label") != "Other Overheads":
-        data["category"] = data["label"]
-    new_entry = RevenueExpense(**data)
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/revenue-expenses", response_model=list[RevenueExpenseOut])
-def get_all_revenue_expenses(db: Session = Depends(get_db)):
-    return db.query(RevenueExpense).all()
-
-@router.get("/revenue-expenses/{entry_id}", response_model=RevenueExpenseOut)
-def get_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/revenue-expenses/{entry_id}", response_model=RevenueExpenseOut)
-def update_revenue_expense(entry_id: int, update: RevenueExpenseUpdate, db: Session = Depends(get_db)):
-    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
-    if "month" in data:
-        data["period"] = get_period(data["month"])
-    if "label" in data and data["label"] != "Other Overheads":
-        data["category"] = data["label"]
-    for field, value in data.items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/revenue-expenses/{entry_id}")
-def delete_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
-# ASSETS & LIABILITIES
-
-@router.post("/asset-liabilities", response_model=AssetLiabilityOut, status_code=201)
-def create_asset_liability(entry: AssetLiabilityCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
-    data["period"] = get_period(data["month"])
-    new_entry = AssetLiability(**data)
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/asset-liabilities", response_model=list[AssetLiabilityOut])
-def get_all_asset_liabilities(db: Session = Depends(get_db)):
-    return db.query(AssetLiability).all()
-
-@router.get("/asset-liabilities/{entry_id}", response_model=AssetLiabilityOut)
-def get_asset_liability(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/asset-liabilities/{entry_id}", response_model=AssetLiabilityOut)
-def update_asset_liability(entry_id: int, update: AssetLiabilityUpdate, db: Session = Depends(get_db)):
-    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
-    if "month" in data:
-        data["period"] = get_period(data["month"])
-    for field, value in data.items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/asset-liabilities/{entry_id}")
-def delete_asset_liability(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
-# CASH FLOW
-
-@router.post("/cash-flows", response_model=CashFlowOut, status_code=201)
-def create_cash_flow(entry: CashFlowCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
-    data["period"] = get_period(data["month"])
-    new_entry = CashFlow(**data)
-    db.add(new_entry)
-    db.commit()
-    db.refresh(new_entry)
-    return new_entry
-
-@router.get("/cash-flows", response_model=list[CashFlowOut])
-def get_all_cash_flows(db: Session = Depends(get_db)):
-    return db.query(CashFlow).all()
-
-@router.get("/cash-flows/{entry_id}", response_model=CashFlowOut)
-def get_cash_flow(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    return entry
-
-@router.put("/cash-flows/{entry_id}", response_model=CashFlowOut)
-def update_cash_flow(entry_id: int, update: CashFlowUpdate, db: Session = Depends(get_db)):
-    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
-    if "month" in data:
-        data["period"] = get_period(data["month"])
-    for field, value in data.items():
-        setattr(entry, field, value)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-@router.delete("/cash-flows/{entry_id}")
-def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
-    entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(entry)
-    db.commit()
-    return {"message": "Entry deleted successfully"}
-
-# CLIENTS
-
-@router.post("/clients", response_model=ClientOut, status_code=201)
-def create_client(entry: ClientCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
-    net, tgt = data.get("netDate"), data.get("targetDate")
-    aging_days, aging_year = calculate_aging(net, tgt)
-    days_out = None
-    if net and tgt:
-        n = net.date() if hasattr(net, 'date') else net
-        t = tgt.date() if hasattr(tgt, 'date') else tgt
-        days_out = (t - n).days if t > n else 0
-    db_entry = Client(**data, daysOutstanding=days_out, agingDays=aging_days, agingYear=aging_year)
-    db.add(db_entry); db.commit(); db.refresh(db_entry)
-    return db_entry
-
-@router.get("/clients", response_model=list[ClientOut])
-def get_all_clients(db: Session = Depends(get_db)):
-    return db.query(Client).all()
-
-@router.get("/clients/{entry_id}", response_model=ClientOut)
-def get_client(entry_id: int, db: Session = Depends(get_db)):
-    e = db.query(Client).filter(Client.id == entry_id).first()
-    if not e: raise HTTPException(status_code=404, detail="Entry not found")
-    return e
-
-@router.put("/clients/{entry_id}", response_model=ClientOut)
-def update_client(entry_id: int, update: ClientUpdate, db: Session = Depends(get_db)):
-    e = db.query(Client).filter(Client.id == entry_id).first()
-    if not e: raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
-    for k, v in data.items(): setattr(e, k, v)
-    if "netDate" in data or "targetDate" in data:
-        aging_days, aging_year = calculate_aging(e.netDate, e.targetDate)
-        net, tgt = e.netDate, e.targetDate
-        if net and tgt:
-            n = net.date() if hasattr(net, 'date') else net
-            t = tgt.date() if hasattr(tgt, 'date') else tgt
-            e.daysOutstanding = (t - n).days if t > n else 0
-        e.agingDays = aging_days; e.agingYear = aging_year
-    db.commit(); db.refresh(e)
-    return e
-
-@router.delete("/clients/{entry_id}")
-def delete_client(entry_id: int, db: Session = Depends(get_db)):
-    e = db.query(Client).filter(Client.id == entry_id).first()
-    if not e: raise HTTPException(status_code=404, detail="Entry not found")
-    db.delete(e); db.commit()
-    return {"message": "Entry deleted successfully"}
-
 FISCAL_MONTHS_IN_ORDER = [
     "October", "November", "December", "January", "February", "March",
     "April", "May", "June", "July", "August", "September"
@@ -327,13 +125,23 @@ def get_profitability_dashboard(
             "revenue":  round(rev, 2),
             "expenses": round(exp, 2),
             "ebit":     round(ebt, 2),
-        })
+            "retained": round(sum(e.value for e in current 
+                                  if e.label == "Retained Profit/(loss)" and e.month == m), 2),
+})
 
     funnel = [
         {"name": "Gross Profit Margin", "value": abs(gross_margin_curr)},
         {"name": "EBIT Margin",         "value": abs(ebit_margin_curr)},
         {"name": "Net Profit Margin",   "value": abs(net_margin_curr)},
     ]
+    expenses_breakdown = [
+        {"name": "Staff Costs",         "value": round(sum_by_label(current, "Staff Costs"), 2)},
+        {"name": "Overhead Depr.",      "value": round(sum_by_label(current, "Overhead Depreciation"), 2)},
+        {"name": "Other Overheads",     "value": round(sum_by_label(current, "Other Overheads"), 2)},
+        {"name": "Misc. Overheads",     "value": round(sum_by_label(current, "Total Miscellaneous Overheads"), 2)},
+        {"name": "Interest",            "value": round(sum_by_label(current, "Interest"), 2)},
+    ]
+    expenses_breakdown = [e for e in expenses_breakdown if e["value"] != 0]
 
     return {
         "kpis": {
@@ -352,6 +160,7 @@ def get_profitability_dashboard(
         "overheadsDetail": overheads_detail,
         "monthlyTrend":    monthly_trend,
         "funnel":          funnel,
+        "expensesBreakdown":  expenses_breakdown,
     }
 @router.get("/dashboard/balance-sheet")
 def get_balance_sheet_dashboard(
@@ -454,13 +263,13 @@ def get_balance_sheet_dashboard(
             "debtToEquity":   {"current": de_c,           "previous": de_p},
             "cash":           {"current": round(cash_c,2),"previous": round(cash_p,2)},
         },
-        "charts": {
-            "totalAssets":           [{"label": "Total Assets",             "current": round(total_assets_c,2),   "previous": round(total_assets_p,2)}],
-            "nonCurrentAssets":      [{"label": "Non-Current Assets",       "current": round(non_curr_c,2),       "previous": round(non_curr_p,2)}],
-            "currentAssets":         [{"label": "Current Assets",           "current": round(curr_c,2),           "previous": round(curr_p,2)}],
-            "totalEquity":           [{"label": "Total Equity & Liabilities","current": round(total_eq_liab_c,2), "previous": round(total_eq_liab_p,2)}],
-            "nonCurrentLiabilities": [{"label": "Non-Current Liabilities",  "current": round(ncl_c,2),            "previous": round(ncl_p,2)}],
-            "currentLiabilities":    [{"label": "Current Liabilities",      "current": round(cl_c,2),             "previous": round(cl_p,2)}],
+       "charts": {
+            "totalAssets":           [{"label": "Total Assets",              "current": round(total_assets_c,2),   "previous": round(total_assets_p,2)}],
+            "nonCurrentAssets":      [{"label": "Non-Current Assets",        "current": round(non_curr_c,2),       "previous": round(non_curr_p,2)}],
+            "currentAssets":         [{"label": "Current Assets",            "current": round(curr_c,2),           "previous": round(curr_p,2)}],
+            "totalEquity":           [{"label": "Total Equity & Liabilities", "current": round(total_eq_liab_c,2), "previous": round(total_eq_liab_p,2)}],
+            "nonCurrentLiabilities": [{"label": "Non-Current Liabilities",   "current": round(ncl_c,2),            "previous": round(ncl_p,2)}],
+            "currentLiabilities":    [{"label": "Current Liabilities",       "current": round(cl_c,2),             "previous": round(cl_p,2)}],
             "nonCurrentAssetsDetail": [
                 row("Other Intangible assets"),
                 row("SB Property, plant and equipment"),
@@ -484,9 +293,21 @@ def get_balance_sheet_dashboard(
                 row("Current income tax payable"),
                 row("Current lease liabilities (IFRS 16)"),
             ],
+            # ── FIXED: use name+value for pie charts ──
             "assetStructure": [
-                {"label": "Non-Current", "current": round(non_curr_c,2), "previous": round(non_curr_p,2)},
-                {"label": "Current",     "current": round(curr_c,2),     "previous": round(curr_p,2)},
+                {"name": "Non-Current Assets", "value": round(non_curr_c, 2)},
+                {"name": "Current Assets",     "value": round(curr_c, 2)},
+            ],
+            # ── NEW: was completely missing ──
+            "liabilityStructure": [
+                {"name": "Non-Current Liab.", "value": round(ncl_c, 2)},
+                {"name": "Current Liab.",     "value": round(cl_c, 2)},
+            ],
+            # ── NEW: was completely missing ──
+            "assetsVsLiabilities": [
+                {"label": "Total",         "assets": round(total_assets_c, 2),  "liabilities": round(total_liab_c, 2)},
+                {"label": "Non-Current",   "assets": round(non_curr_c, 2),      "liabilities": round(ncl_c, 2)},
+                {"label": "Current",       "assets": round(curr_c, 2),          "liabilities": round(cl_c, 2)},
             ],
             "currentAssetsBreakdown": [
                 {"label": "Trade Receivables", "current": round(recv_c,2),    "previous": round(recv_p,2)},

@@ -27,7 +27,7 @@ function Accueil() {
   };
 
   const getRoleBadgeStyle = (role) => {
-    if (role === 'manager') return { backgroundColor: '#092A5E', color: 'white' };
+    if (role === 'manager') return { backgroundColor: '#092A5E', color: 'white' };k
     if (role === 'leader')  return { backgroundColor: '#70CBF4', color: 'white' };
     return { backgroundColor: '#E5E7EB', color: '#374151' };
   };
