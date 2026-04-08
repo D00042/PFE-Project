@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.sql import func
 from database.db import Base
 
@@ -50,7 +50,6 @@ class AssetLiability(Base):
     month       = Column(String, nullable=False)
     period      = Column(String, nullable=False)
     value       = Column(Float, nullable=False)
-    type        = Column(String, nullable=True)
     createdAt   = Column(DateTime, server_default=func.now())
     updatedAt   = Column(DateTime, onupdate=func.now())
 

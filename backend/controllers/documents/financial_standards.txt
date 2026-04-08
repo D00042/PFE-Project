@@ -1,0 +1,170 @@
+=== TUNISIAN COMMERCIAL COMPANIES CODE (Law No. 2000-93) ===
+=== RELEVANT ARTICLES FOR FINANCIAL ANALYSIS ===
+
+-------------------------------------------------------------
+ARTICLE 5 - Share Capital as Creditor Guarantee
+-------------------------------------------------------------
+Contributions may be in cash, in kind, or in services. All
+contributions except services constitute the company's share
+capital. The share capital is the exclusive guarantee for
+company creditors.
+Relevance: Balance Sheet — equity and total assets monitoring.
+
+-------------------------------------------------------------
+ARTICLE 13 - Mandatory Statutory Auditor
+-------------------------------------------------------------
+All commercial companies must appoint a statutory auditor.
+Companies other than joint-stock companies are exempt if they
+do not meet at least two of the following thresholds: total
+balance sheet value, total revenue excluding tax, and average
+number of employees.
+Relevance: Balance Sheet — total assets threshold monitoring.
+
+-------------------------------------------------------------
+ARTICLE 13 QUINQUIES - Financial Statement Compliance
+-------------------------------------------------------------
+Directors and financial officers must sign an annual
+declaration confirming that the financial statements have been
+prepared in full compliance with applicable accounting
+legislation.
+Relevance: All dashboards — general compliance context.
+
+-------------------------------------------------------------
+ARTICLE 27 - Equity Below Half of Share Capital
+-------------------------------------------------------------
+A company may be dissolved when its equity falls below half
+of its share capital due to recorded losses. The legal
+representative must convene a general assembly to decide on
+either dissolution or continuation with financial
+regularisation.
+Relevance: Balance Sheet — CRITICAL flag if equity ratio
+drops below 50%.
+
+-------------------------------------------------------------
+ARTICLE 128 - Financial Statement Approval Deadline (SARL)
+-------------------------------------------------------------
+The annual general meeting must be held within six months of
+the close of the financial year. Financial statements must be
+communicated to shareholders at least thirty days before the
+meeting.
+Relevance: All dashboards — reporting deadline compliance.
+
+-------------------------------------------------------------
+ARTICLE 256 BIS - Mandatory Audit Committee
+-------------------------------------------------------------
+A permanent audit committee is mandatory for companies whose
+consolidated balance sheet exceeds 100 million Tunisian
+dinars. The committee monitors internal controls, financial
+reliability, and legal compliance.
+Relevance: All dashboards — internal control context.
+
+-------------------------------------------------------------
+ARTICLE 266 - Auditor Scope of Investigation
+-------------------------------------------------------------
+The statutory auditor must verify the company's books, cash
+position, portfolio, and securities. They certify the
+accuracy of annual accounts and periodically assess the
+effectiveness of the internal control system.
+Relevance: Balance Sheet and Liquidity — cash and controls.
+
+-------------------------------------------------------------
+ARTICLE 275 - Annual General Meeting Obligation (SA)
+-------------------------------------------------------------
+The ordinary general meeting must be held at least once a
+year within six months of the close of the financial year to
+review management, approve financial statements, and decide
+on profit allocation. Any approval without a prior auditor
+report presentation is null and void.
+Relevance: All dashboards — annual reporting obligation.
+
+-------------------------------------------------------------
+ARTICLE 287 - Distributable Profit Calculation (SA)
+-------------------------------------------------------------
+The distributable profit equals the net accounting result
+adjusted for prior year carry-forwards, after deducting:
+5% mandatory allocation to legal reserves until that reserve
+reaches 10% of share capital, special legislative reserves,
+and statutory reserves. Any resolution in violation is null.
+Relevance: Profitability — net profit and retained profit KPIs.
+
+-------------------------------------------------------------
+ARTICLE 288 - Dividend Distribution Restriction (SA)
+-------------------------------------------------------------
+No distribution may be made to shareholders when company
+equity is or would become lower than the share capital plus
+non-distributable reserves following the distribution.
+Relevance: Balance Sheet and Profitability — equity ratio.
+
+-------------------------------------------------------------
+ARTICLE 289 - Prohibition of Fictitious Distributions (SA)
+-------------------------------------------------------------
+Any profit distribution made in violation of Article 288 is
+considered fictitious and is prohibited.
+Relevance: Profitability — net margin and retained profit.
+
+-------------------------------------------------------------
+ARTICLE 307-308 - Capital Reduction Due to Losses
+-------------------------------------------------------------
+Capital reduction is permitted when losses have reached half
+of equity and operations have continued without the asset
+base being restored. Reduction may be by reducing number of
+shares or their nominal value, per auditor report.
+Relevance: Balance Sheet — equity ratio KPI.
+
+-------------------------------------------------------------
+ARTICLE 388 - Mandatory Action When Equity Below 50% (SA)
+-------------------------------------------------------------
+When financial statements show equity has fallen below half
+of share capital due to losses, the board must within four
+months of accounts approval convene an extraordinary general
+meeting to decide on dissolution. If no dissolution is
+decided within one year of recording the losses, the company
+must reduce or increase capital by at least the amount of
+losses. Failure allows any interested party to request
+judicial dissolution.
+Relevance: Balance Sheet — MOST CRITICAL. Flag if equity
+ratio is below 50% with the 4-month deadline obligation.
+
+-------------------------------------------------------------
+ARTICLE 471 - Consolidated Financial Statements Obligation
+-------------------------------------------------------------
+A parent company must prepare consolidated financial
+statements in addition to its own annual accounts, audited
+by registered statutory auditors.
+Relevance: All dashboards — TUI TGBST group reporting.
+
+-------------------------------------------------------------
+ARTICLE 472 - Consolidated Statements Publication Deadline
+-------------------------------------------------------------
+Consolidated financial statements must be made available to
+shareholders at least one month before the general assembly
+and published within one month of their approval.
+Relevance: All dashboards — group reporting deadlines.
+
+-------------------------------------------------------------
+ARTICLE 474 - Intra-Group Financial Operations
+-------------------------------------------------------------
+Financial operations between group companies are permitted
+when one holds more than half of another's capital, provided
+the operation is commercially justified, not tax-motivated,
+has effective counterpart value, and does not serve personal
+interests of directors.
+Relevance: Liquidity and Balance Sheet — intra-group flows.
+
+=== AUTOMATIC FLAG CONDITIONS ===
+
+FLAG 1 - CRITICAL: If equity ratio is below 50%, cite
+Articles 27 and 388. Legal action required within 4 months.
+
+FLAG 2 - WARNING: If net profit margin is negative, cite
+Article 287. No dividend distribution is legally permitted.
+
+FLAG 3 - WARNING: If current ratio is below 1.0, cite
+Article 266. Liquidity risk requires auditor attention.
+
+FLAG 4 - INFO: If legal reserve has not reached 10% of
+share capital, cite Article 287. 5% allocation is mandatory.
+
+FLAG 5 - CRITICAL: If equity would fall below share capital
+after any distribution, cite Article 288. Distribution is
+legally prohibited.

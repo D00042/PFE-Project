@@ -8,8 +8,7 @@ from schemas.data import (
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
     ClientCreate, ClientUpdate, ClientOut,
 )
-from core.dependencies import get_current_user
-from models.user import User
+
 router = APIRouter(tags=["data"])
 
 FISCAL_PERIOD_MAP = {
@@ -26,7 +25,7 @@ def get_period(month: str) -> str:
 
 @router.post("/revenue-expenses", response_model=RevenueExpenseOut, status_code=201)
 def create_revenue_expense(entry: RevenueExpenseCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
+    data = entry.model_dump()
     data["period"] = get_period(data["month"])
     if data.get("label") != "Other Overheads":
         data["category"] = data["label"]
@@ -52,7 +51,7 @@ def update_revenue_expense(entry_id: int, update: RevenueExpenseUpdate, db: Sess
     entry = db.query(RevenueExpense).filter(RevenueExpense.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
+    data = update.model_dump(exclude_unset=True)
     if "month" in data:
         data["period"] = get_period(data["month"])
     if "label" in data and data["label"] != "Other Overheads":
@@ -76,7 +75,7 @@ def delete_revenue_expense(entry_id: int, db: Session = Depends(get_db)):
 
 @router.post("/asset-liabilities", response_model=AssetLiabilityOut, status_code=201)
 def create_asset_liability(entry: AssetLiabilityCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
+    data = entry.model_dump()
     data["period"] = get_period(data["month"])
     new_entry = AssetLiability(**data)
     db.add(new_entry)
@@ -100,7 +99,7 @@ def update_asset_liability(entry_id: int, update: AssetLiabilityUpdate, db: Sess
     entry = db.query(AssetLiability).filter(AssetLiability.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
+    data = update.model_dump(exclude_unset=True)
     if "month" in data:
         data["period"] = get_period(data["month"])
     for field, value in data.items():
@@ -122,7 +121,7 @@ def delete_asset_liability(entry_id: int, db: Session = Depends(get_db)):
 
 @router.post("/cash-flows", response_model=CashFlowOut, status_code=201)
 def create_cash_flow(entry: CashFlowCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
+    data = entry.model_dump()
     data["period"] = get_period(data["month"])
     new_entry = CashFlow(**data)
     db.add(new_entry)
@@ -146,7 +145,7 @@ def update_cash_flow(entry_id: int, update: CashFlowUpdate, db: Session = Depend
     entry = db.query(CashFlow).filter(CashFlow.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
+    data = update.model_dump(exclude_unset=True)
     if "month" in data:
         data["period"] = get_period(data["month"])
     for field, value in data.items():
@@ -168,7 +167,7 @@ def delete_cash_flow(entry_id: int, db: Session = Depends(get_db)):
 
 @router.post("/clients", response_model=ClientOut, status_code=201)
 def create_client(entry: ClientCreate, db: Session = Depends(get_db)):
-    data = entry.dict()
+    data = entry.model_dump()
     net, tgt = data.get("netDate"), data.get("targetDate")
     aging_days, aging_year = calculate_aging(net, tgt)
     days_out = None
@@ -194,7 +193,7 @@ def get_client(entry_id: int, db: Session = Depends(get_db)):
 def update_client(entry_id: int, update: ClientUpdate, db: Session = Depends(get_db)):
     e = db.query(Client).filter(Client.id == entry_id).first()
     if not e: raise HTTPException(status_code=404, detail="Entry not found")
-    data = update.dict(exclude_unset=True)
+    data = update.model_dump(exclude_unset=True)
     for k, v in data.items(): setattr(e, k, v)
     if "netDate" in data or "targetDate" in data:
         aging_days, aging_year = calculate_aging(e.netDate, e.targetDate)

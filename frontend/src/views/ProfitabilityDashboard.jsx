@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import dashboardService from '../services/dashboardService';
+import ProfitabilityAIPanel from "../components/ProfitabilityAIPanel";
+import GlobalAIPanel from "../components/GlobalAIPanel";
 import {
   ComposedChart, BarChart, Bar, Line,
   LineChart, PieChart, Pie,
@@ -79,12 +81,33 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
   );
 };
 
-const exportPDF = () => window.print();
-
+const exportPDF = () => {
+  const originalZoom = document.body.style.zoom;
+  document.body.style.zoom = "100%";
+  window.print();
+  document.body.style.zoom = originalZoom;
+};
 if (!document.getElementById("prof-print-style")) {
   const s = document.createElement("style");
   s.id = "prof-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #prof-print,#prof-print *{visibility:visible} #prof-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  s.textContent = `
+  @media print {
+    body * { visibility: hidden; }
+    #prof-print, #prof-print * { visibility: visible; }
+    #prof-print { 
+      position: absolute; 
+      left: 0; 
+      top: 0; 
+      width: 100%;
+    }
+    button { display: none !important; }
+    .no-print { display: none !important; }
+    @page {
+      size: A3 landscape;
+      margin: 10mm;
+    }
+  }
+`;
   document.head.appendChild(s);
 }
 
@@ -130,57 +153,25 @@ const [aiError, setAiError]               = useState("");
     } catch { setError("Network error."); }
     finally { setLoading(false); }
   };
-  const fetchInterpretation = async () => {
-    if (!data) return;
-    setLoadingAI(true);
-    setAiError("");
-    setInterpretation("");
-    try {
-        const { data: result } = await dashboardService
-            .interpretProfitability({
-                year,
-                period,
-                grossMargin:         data.kpis.grossMargin?.current      ?? 0,
-                grossMarginPrev:     data.kpis.grossMargin?.previous     ?? 0,
-                ebitMargin:          data.kpis.ebitMargin?.current       ?? 0,
-                ebitMarginPrev:      data.kpis.ebitMargin?.previous      ?? 0,
-                netProfitMargin:     data.kpis.netProfitMargin?.current  ?? 0,
-                netProfitMarginPrev: data.kpis.netProfitMargin?.previous ?? 0,
-                roa:                 data.kpis.roa?.current              ?? 0,
-                roaPrev:             data.kpis.roa?.previous             ?? 0,
-                roe:                 data.kpis.roe?.current              ?? 0,
-                roePrev:             data.kpis.roe?.previous             ?? 0,
-                totalRevenue:        data.kpis.totalRevenue?.current     ?? 0,
-                totalRevenuePrev:    data.kpis.totalRevenue?.previous    ?? 0,
-                // Chart data
-                plSummary:    data.plSummary    ?? [],
-                monthlyTrend: data.monthlyTrend ?? [],
-            });
-        setInterpretation(result.interpretation);
-    } catch {
-        setAiError("Failed to generate interpretation. Please try again.");
-    } finally {
-        setLoadingAI(false);
-    }
-};
+  
   // ── Waterfall (now column + line) ─────────────────────────────────────────
   const waterfallData = useMemo(() => {
     if (!data) return [];
     const pl  = data.plSummary;
     const get = (label) => pl.find(r => r.label === label)?.current ?? 0;
     const steps = [
-      { name:"Revenue",         value:  get("Revenue"),                       type:"total"    },
+      { name:"Revenue",         value:  get("Revenue"),                       type:"positive"    },
       { name:"Staff Costs",     value: -get("Staff Costs"),                   type:"negative" },
       { name:"Ovhd Depr.",      value: -get("Overhead Depreciation"),         type:"negative" },
       { name:"Other Overheads", value: -get("Other Overheads"),               type:"negative" },
       { name:"Misc. Overheads", value: -get("Total Miscellaneous Overheads"), type:"negative" },
       { name:"Interest",        value: -get("Interest"),                      type:"negative" },
-      { name:"EBIT",            value:  get("EBIT"),                          type:"total"    },
+      { name:"EBIT",            value:  get("EBIT"),                          type:"positive"    },
     ];
     let running = 0;
     return steps.map((s) => {
-      if (s.type === "total") {
-        running = s.value;
+      if (s.type === "positive") {
+        running = s.value; 
         return { ...s, bar: s.value, fill: COLORS.total, cumulative: running };
       }
       running += s.value;
@@ -270,7 +261,8 @@ const [aiError, setAiError]               = useState("");
         </div>
         <span style={S.currencyLabel}>Values in EUR</span>
       </div>
-
+      {/* ── Global AI Panel ── */}
+<GlobalAIPanel year={year} period={period} />
       {/* ── KPI Cards ── */}
       <div style={S.kpiRow}>
         {kpiCards.map(({ label, key, unit, icon }) => {
@@ -282,79 +274,39 @@ const [aiError, setAiError]               = useState("");
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                 {icon}<p style={S.kpiTitle}>{label}</p>
               </div>
-              <p style={S.kpiRowLabel}>Current</p>
+              <p style={S.kpiRowLabel}>Current Year</p>
               <p style={{ ...S.kpiValue, color: up ? COLORS.blue : COLORS.red }}>{curr.toFixed(1)}{unit}</p>
-              <p style={S.kpiRowLabel}>Previous</p>
+              <p style={S.kpiRowLabel}>Previous Year</p>
               <p style={{ ...S.kpiValueSm, color:COLORS.grey }}>{prev.toFixed(1)}{unit}</p>
               <div style={{ marginTop:6, fontSize:10, fontWeight:700, color: up ? COLORS.green : COLORS.red }}>
-                {up ? "▲" : "▼"} {Math.abs(curr - prev).toFixed(1)}% vs prev
+                {up ? "▲" : "▼"} {Math.abs(curr - prev).toFixed(1)}% vs previous year
               </div>
             </div>
           );
         })}
       </div>
-{/* AI Interpretation Panel */}
-<div style={S.aiPanel}>
-    <div style={S.aiPanelHeader}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <img 
-    src="/statistical-analysis.png" 
-    alt="AI" 
-    style={{ width: 24, height: 24 }}
-/>
-            <p style={S.aiPanelTitle}>AI Interpretation</p>
-        </div>
-        <button
-            style={{
-                ...S.aiBtn,
-                opacity: loadingAI ? 0.6 : 1,
-                cursor:  loadingAI ? "wait" : "pointer",
-            }}
-            onClick={fetchInterpretation}
-            disabled={loadingAI || !data}
-        >
-            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
-        </button>
-    </div>
+      <ProfitabilityAIPanel year={year} period={period} />
 
-    {aiError && (
-        <p style={S.aiError}>{aiError}</p>
-    )}
-
-    {!interpretation && !loadingAI && !aiError && (
-        <p style={S.aiPlaceholder}>
-            Click "Generate Interpretation" to get an AI-powered 
-            analysis of the current dashboard metrics.
-        </p>
-    )}
-
-    {loadingAI && (
-        <div style={{ display:"flex", alignItems:"center", 
-                      gap:10, padding:"12px 0" }}>
-            <div style={S.aiSpinner}/>
-            <p style={{ color:COLORS.grey, fontSize:13 }}>
-                Analyzing your financial data...
-            </p>
-        </div>
-    )}
-
-    {interpretation && (
-        <p style={S.aiText}>{interpretation}</p>
-    )}
-</div>
-      {/* ── Row 1: P&L Summary + Overheads ── */}
+   {/* ── Row 1: P&L Summary + Overheads ── */}
       <div style={S.row2}>
-
-        {/* P&L Summary — dark blue current, light blue previous */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Profit &amp; Loss Summary</p>
           <div style={S.legendRow}>
-            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Current Year</span>
-            <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
+            <span style={S.dot(COLORS.blue)}/>
+            <span style={S.legendText}>Current Year</span>
+            <span style={S.dot(COLORS.blueLight)}/>
+            <span style={S.legendText}>Previous Year</span>
+            <span style={S.dot(COLORS.amber)}/>
+            <span style={S.legendText}>Budget</span>
           </div>
           <ResponsiveContainer width="100%" height={360}>
             <BarChart data={plSummary} margin={{ bottom:8, left:8, right:8, top:22 }}>
-              <XAxis dataKey="label" interval={0} height={52} tick={<WrappedTick maxChars={9} fontSize={9}/>}/>
+              <XAxis
+                dataKey="label"
+                interval={0}
+                height={52}
+                tick={<WrappedTick maxChars={9} fontSize={9}/>}
+              />
               <YAxis tick={{ fontSize:10 }} tickFormatter={fmt}/>
               <Tooltip formatter={(v) => fmtFull(v)}/>
               <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
@@ -363,20 +315,18 @@ const [aiError, setAiError]               = useState("");
               <Bar dataKey="previous" name="Previous Year" fill={COLORS.blueLight} radius={[4,4,0,0]}>
                 <LabelList dataKey="previous" position="top" formatter={fmt} style={lbTopGrey}/>
               </Bar>
+              <Bar dataKey="budget"   name="Budget"        fill={COLORS.amber}     radius={[4,4,0,0]}>
+                <LabelList dataKey="budget"   position="top" formatter={fmt}
+                  style={{ fontSize:8, fill:COLORS.amber, fontWeight:600 }}/>
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Overheads — sorted descending, with category slicer */}
         <div style={S.chartCard}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
             <p style={{ ...S.chartTitle, margin:0 }}>Other Overheads Details</p>
-            {/* ── Slicer: filter by category ── */}
-            <select
-              value={overheadCat}
-              onChange={e => setOverheadCat(e.target.value)}
-              style={S.slicerSelect}
-            >
+            <select value={overheadCat} onChange={e => setOverheadCat(e.target.value)} style={S.slicerSelect}>
               {OVERHEAD_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -400,14 +350,11 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Row 2: Waterfall (column + line) + Expenses Pie ── */}
+      {/* ── Row 2: Waterfall + Expenses Pie ── */}
       <div style={S.row2}>
-
-        {/* P&L Waterfall — column bars + cumulative line */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>P&amp;L Waterfall — Revenue to EBIT</p>
           <div style={S.legendRow}>
-            <span style={S.dot(COLORS.total)}/><span style={S.legendText}>Total</span>
             <span style={S.dot(COLORS.positive)}/><span style={S.legendText}>Positive</span>
             <span style={S.dot(COLORS.negative)}/><span style={S.legendText}>Deduction</span>
             <span style={{ display:"inline-block", width:16, height:3, background:COLORS.amber, marginRight:4, verticalAlign:"middle", borderRadius:2 }}/>
@@ -423,27 +370,17 @@ const [aiError, setAiError]               = useState("");
                 return [fmtFull(props.payload.value ?? v), props.payload.name];
               }}/>
               <ReferenceLine y={0} stroke="#CBD5E1"/>
-              {/* Column bars — each colored by fill property */}
               <Bar dataKey="bar" name="Amount" radius={[4,4,0,0]}>
                 <LabelList dataKey="bar" position="top" formatter={fmt} style={{ fontSize:9, fontWeight:600, fill:COLORS.navy }}/>
                 {waterfallData.map((e, i) => <Cell key={i} fill={e.fill}/>)}
               </Bar>
-              {/* Cumulative line on top */}
-              <Line
-                type="monotone"
-                dataKey="cumulative"
-                name="Running Total"
-                stroke={COLORS.amber}
-                strokeWidth={2.5}
-                strokeDasharray="5 3"
-                dot={{ r:5, fill:COLORS.amber, strokeWidth:0 }}
-                activeDot={{ r:7 }}
-              />
+              <Line type="monotone" dataKey="cumulative" name="Running Total"
+                stroke={COLORS.amber} strokeWidth={2.5} strokeDasharray="5 3"
+                dot={{ r:5, fill:COLORS.amber, strokeWidth:0 }} activeDot={{ r:7 }}/>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Expenses Pie */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Expenses Distribution</p>
           <ResponsiveContainer width="100%" height={360}>
@@ -459,45 +396,15 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Row 3: Margins + Revenue vs Cash Flow (NEW) ── */}
+      {/* ── Row 3: Revenue vs Cash Flow + Monthly EBIT Trend ── */}
       <div style={S.row2}>
-
-        {/* Margins — dark blue current, light blue previous */}
-        <div style={S.chartCard}>
-          <p style={S.chartTitle}>Profitability Margins — Current vs Previous</p>
-          <div style={S.legendRow}>
-            <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Current Year</span>
-            <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Previous Year</span>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={marginsData} margin={{ bottom:8, left:8, right:8, top:22 }}>
-              <XAxis dataKey="name" interval={0} height={44} tick={<WrappedTick maxChars={10} fontSize={10}/>}/>
-              <YAxis tick={{ fontSize:11 }} tickFormatter={(v) => `${v}%`}/>
-              <Tooltip formatter={(v) => [`${v.toFixed(1)}%`]}/>
-              <ReferenceLine y={0} stroke="#CBD5E1"/>
-              <Bar dataKey="current"  name="Current Year"  fill={COLORS.blue}      radius={[4,4,0,0]}>
-                <LabelList dataKey="current"  position="top" formatter={(v) => `${v.toFixed(1)}%`} style={{ fontSize:9, fill:COLORS.navy, fontWeight:700 }}/>
-              </Bar>
-              <Bar dataKey="previous" name="Previous Year" fill={COLORS.blueLight} radius={[4,4,0,0]}>
-                <LabelList dataKey="previous" position="top" formatter={(v) => `${v.toFixed(1)}%`} style={{ fontSize:9, fill:COLORS.grey }}/>
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Revenue vs Cash Flow — NEW dual line chart */}
         <div style={S.chartCard}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
             <div>
               <p style={{ ...S.chartTitle, margin:0 }}>Revenue vs Operating Cash Flow</p>
               <p style={S.chartSub}>Detect cash conversion problems</p>
             </div>
-            {/* ── Slicer: highlight gap months ── */}
-            <select
-              value={cashFlowType}
-              onChange={e => setCashFlowType(e.target.value)}
-              style={S.slicerSelect}
-            >
+            <select value={cashFlowType} onChange={e => setCashFlowType(e.target.value)} style={S.slicerSelect}>
               <option value="All">All months</option>
               <option value="positive">CF Positive only</option>
               <option value="negative">CF Negative only</option>
@@ -520,17 +427,12 @@ const [aiError, setAiError]               = useState("");
                 contentStyle={{ borderRadius:8, border:"none", boxShadow:"0 4px 16px rgba(0,0,0,0.1)", fontSize:12 }}/>
               <ReferenceLine y={0} stroke="#CBD5E1" strokeDasharray="4 2"/>
               <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize:11 }}/>
-              <Line type="monotone" dataKey="revenue"     name="Revenue"    stroke={COLORS.blue} strokeWidth={2.5} dot={{ r:4 }} activeDot={{ r:6 }}/>
-              <Line type="monotone" dataKey="operatingCF" name="Operating CF" stroke={COLORS.teal} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r:4 }} activeDot={{ r:6 }}/>
+              <Line type="monotone" dataKey="revenue"     name="Revenue"       stroke={COLORS.blue} strokeWidth={2.5} dot={{ r:4 }} activeDot={{ r:6 }}/>
+              <Line type="monotone" dataKey="operatingCF" name="Operating CF"  stroke={COLORS.teal} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r:4 }} activeDot={{ r:6 }}/>
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
 
-      {/* ── Row 4: Monthly Trend (revenue bar removed) + Revenue vs Budget ── */}
-      <div style={S.row2}>
-
-        {/* Monthly Trend — revenue line removed, revenue bar kept for reference */}
         <div style={S.chartCard}>
           <p style={S.chartTitle}>
             Monthly EBIT &amp; Expense Trend
@@ -541,26 +443,27 @@ const [aiError, setAiError]               = useState("");
             <span style={S.dot(COLORS.red)}/><span style={S.legendText}>EBIT</span>
             <span style={S.dot(COLORS.grey)}/><span style={S.legendText}>Expenses</span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={monthlyTrend} margin={{ bottom:8, left:8, right:16, top:22 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
               <XAxis dataKey="month" interval={0} height={36} tick={<WrappedTick maxChars={12} fontSize={9}/>}/>
               <YAxis tick={{ fontSize:11 }} tickFormatter={fmt}/>
               <Tooltip formatter={(v, name) => [fmtFull(v), name]}/>
               <ReferenceLine y={0} stroke="#CBD5E1" strokeDasharray="4 2"/>
-              <Bar yAxisId={undefined} dataKey="revenue" name="Revenue" fill={COLORS.blueLight} radius={[3,3,0,0]} opacity={0.4}>
+              <Bar dataKey="revenue" name="Revenue" fill={COLORS.blueLight} radius={[3,3,0,0]} opacity={0.4}>
                 <LabelList dataKey="revenue" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.blue, fontWeight:600 }}/>
               </Bar>
-              {/* Revenue LINE removed as requested */}
               <Line type="monotone" dataKey="ebit"     name="EBIT"     stroke={COLORS.red}  strokeWidth={2} dot={{ r:3 }}/>
               <Line type="monotone" dataKey="expenses" name="Expenses" stroke={COLORS.grey} strokeWidth={2} strokeDasharray="4 3" dot={{ r:3 }}/>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+      </div>
 
-        {/* Revenue vs Budget */}
+      {/* ── Row 4: Revenue vs Budget + Expense vs Net Profit ── */}
+      <div style={S.row2}>
         <div style={S.chartCard}>
-          <p style={S.chartTitle}>Revenue vs Budget</p>
+          <p style={S.chartTitle}>Revenue Forecast</p>
           <div style={S.legendRow}>
             <span style={S.dot(COLORS.blue)}/><span style={S.legendText}>Actual</span>
             <span style={S.dot(COLORS.amberLight)}/><span style={S.legendText}>Budget</span>
@@ -579,25 +482,17 @@ const [aiError, setAiError]               = useState("");
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
 
-      {/* ── Row 5: Expense vs Net Profit (FIXED) ── */}
-      <div style={{ padding:"0 28px", marginBottom:24 }}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Expense vs Net Profit by Month</p>
-          <p style={S.chartSub}>Stacked view: expenses base + net profit on top</p>
+          <p style={S.chartSub}>Expenses compared to retained profit per month</p>
           <div style={S.legendRow}>
             <span style={S.dot(COLORS.blueLight)}/><span style={S.legendText}>Expenses</span>
             <span style={S.dot(COLORS.green)}/><span style={S.legendText}>Net Profit (Retained)</span>
           </div>
           <ResponsiveContainer width="100%" height={280}>
-            {/* Use ComposedChart so we can have separate bars (not stacked) clearly */}
             <ComposedChart
-              data={monthlyTrend.map(m => ({
-                ...m,
-                // retained can be negative — keep as-is so it shows correctly
-                retainedDisplay: m.retained ?? 0,
-              }))}
+              data={monthlyTrend.map(m => ({ ...m, retainedDisplay: m.retained ?? 0 }))}
               margin={{ bottom:8, left:8, right:8, top:22 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9"/>
@@ -605,7 +500,7 @@ const [aiError, setAiError]               = useState("");
               <YAxis tick={{ fontSize:10 }} tickFormatter={fmt}/>
               <Tooltip formatter={(v, name) => [fmtFull(v), name]}/>
               <ReferenceLine y={0} stroke="#CBD5E1"/>
-              <Bar dataKey="expenses"       name="Expenses"   fill={COLORS.blueLight} radius={[4,4,0,0]}/>
+              <Bar dataKey="expenses"        name="Expenses"   fill={COLORS.blueLight} radius={[4,4,0,0]}/>
               <Bar dataKey="retainedDisplay" name="Net Profit" fill={COLORS.green}     radius={[4,4,0,0]}>
                 <LabelList dataKey="retainedDisplay" position="top" formatter={fmt} style={{ fontSize:8, fill:COLORS.green, fontWeight:600 }}/>
               </Bar>
@@ -614,7 +509,12 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
+    
+
     </div>
+  
+
+    
   );
 }
 

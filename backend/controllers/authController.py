@@ -1,11 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.user import User,UserRole
-from schemas.auth import UserRegister, UserLogin, UserUpdate, PasswordResetRequest, PasswordResetConfirm
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from models.user import User
+from schemas.auth import UserLogin, PasswordResetRequest
 from schemas.auth import ChangePassword
 from core.security import (
     hash_password,
@@ -13,6 +10,7 @@ from core.security import (
     create_access_token,
     create_password_reset_token,
     verify_password_reset_token
+    
 )
 from core.dependencies import get_current_user, require_roles
 from core.email import send_password_changed_email
@@ -98,17 +96,27 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if "email" in updates:
+    if "email" in updates and updates["email"]:
+        # Check if email is already taken by another user
+        existing = db.query(User).filter(
+            User.email == updates["email"],
+            User.id != current_user.id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use by another account")
         current_user.email = updates["email"]
-    if "password" in updates:
-        current_user.hashed_password = hash_password(updates["password"])
-
+ 
+    if "fullName" in updates:
+        current_user.fullName = updates["fullName"]
+ 
+    if "telephone" in updates:
+        current_user.telephone = updates["telephone"]
+ 
     db.commit()
     db.refresh(current_user)
-
+ 
     return {"message": "Profile updated successfully"}
-
-
+ 
 
 
 
@@ -156,7 +164,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 @router.post("/reset-password")
 def reset_password(token: str, new_password: str, db: Session = Depends(get_db)):
 
-    payload = decode_token(token)
+    payload = verify_password_reset_token(token)
     email = payload.get("sub")
 
     user = db.query(User).filter(User.email == email).first()

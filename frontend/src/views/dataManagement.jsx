@@ -113,7 +113,7 @@ const FILTER_CONFIG = {
 
 const emptyForms = {
   revenue:  { label: '', code: '', year: '', month: 'October', value: '', frequency: 'periodic', type: 'Actual', category: '' },
-  assets:   { label: '', code: '', category: '', subCategory: '', year: '', month: 'October', value: '', type: 'Actual' },
+  assets:   { label: '', code: '', category: '', subCategory: '', year: '', month: 'October', value: '' },
   cashflow: { label: '', code: '', year: '', month: 'October', value: '' },
   clients:  { clientName: '', clientType: 'supplier', amount: '', expenseCategory: '', netDate: '', targetDate: '', year: '', address: '', telephone: '' },
 };
@@ -273,7 +273,8 @@ export default function DataManagement() {
         await dataService.put(`${currentCat.endpoint}/${selectedEntry.id}`, upd);
         setMessage('Entry updated!');
       }
-      setTimeout(() => { setShowModal(false); setMessage(''); fetchEntries(); }, 1200);
+      setTimeout(() => { setShowModal(false); fetchEntries(); }, 1200);
+      setTimeout(() => setMessage(''), 4000);
     } catch (err) {
       setError(err?.response?.data?.detail || JSON.stringify(err) || 'Operation failed');
     } finally {
@@ -286,7 +287,9 @@ export default function DataManagement() {
     if (!window.confirm('Delete this entry?')) return;
     try {
       await dataService.delete(`${currentCat.endpoint}/${id}`);
+      setMessage('Entry deleted successfully.');
       fetchEntries();
+      setTimeout(() => setMessage(''), 4000);
     } catch {
       setError('Failed to delete');
     }
@@ -294,7 +297,7 @@ export default function DataManagement() {
 
   const getColumns = () => {
     if (activeCategory === 'revenue')  return ['ID', 'Label', 'Code', 'Year', 'Month', 'Amount', 'Frequency', 'Type', 'Actions'];
-    if (activeCategory === 'assets')   return ['ID', 'Label', 'Code', 'Category', 'Sub-Cat', 'Year', 'Month', 'Amount', 'Type', 'Actions'];
+    if (activeCategory === 'assets')   return ['ID', 'Label', 'Code', 'Category', 'Sub-Cat', 'Year', 'Month', 'Amount', 'Actions'];
     if (activeCategory === 'cashflow') return ['ID', 'Label', 'Code', 'Year', 'Month', 'Amount', 'Actions'];
     if (activeCategory === 'clients')  return ['ID', 'Name', 'Type', 'Amount', 'Expense Cat.', 'Net Date', 'Target Date', 'Days Out.', 'Aging', 'Aging Year', 'Actions'];
     return [];
@@ -304,7 +307,7 @@ export default function DataManagement() {
     const fmt  = n => n != null ? Number(n).toLocaleString() : '—';
     const fmtD = d => d ? d.split('T')[0] : '—';
     if (activeCategory === 'revenue')  return [e.id, e.label, e.code, e.year, e.month, fmt(e.value), e.frequency, e.type];
-    if (activeCategory === 'assets')   return [e.id, e.label, e.code, e.category, e.subCategory, e.year, e.month, fmt(e.value), e.type || '—'];
+    if (activeCategory === 'assets')   return [e.id, e.label, e.code, e.category, e.subCategory, e.year, e.month, fmt(e.value)|| '—'];
     if (activeCategory === 'cashflow') return [e.id, e.label, e.code, e.year, e.month, fmt(e.value)];
     if (activeCategory === 'clients')  return [e.id, e.clientName, e.clientType, fmt(e.amount), e.expenseCategory || '—', fmtD(e.netDate), fmtD(e.targetDate), e.daysOutstanding ?? '—', e.agingDays || '—', e.agingYear || '—'];
     return [];
@@ -412,12 +415,6 @@ export default function DataManagement() {
           <input value={form.code} readOnly style={F.inputRO} />
         </Field>
 
-        <Field label="Type *">
-          <select name="type" value={form.type} onChange={handleChange} style={F.input}>
-            <option value="Actual">Actual</option>
-            <option value="Budget">Budget</option>
-          </select>
-        </Field>
 
         <Field label="Category (auto-filled)">
           <input value={form.category} readOnly style={F.inputRO} />
@@ -487,28 +484,42 @@ export default function DataManagement() {
           </select>
         </Field>
 
-        <Field label="Amount *">
+<Field label="Amount *">
           <input type="number" name="amount" value={form.amount} onChange={handleChange} style={F.input} placeholder="e.g. 45000" required />
         </Field>
 
         <YearField value={form.year} onChange={handleChange} />
 
-        <div style={F.span2}>
-          <Field label="Expense Category">
-            <select name="expenseCategory" value={form.expenseCategory} onChange={handleChange} style={F.input}>
-              <option value="">— Select category —</option>
-              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Net Date *">
-          <input type="date" name="netDate" value={form.netDate} onChange={handleChange} style={F.input} required />
-        </Field>
-
         <Field label="Target Date *">
           <input type="date" name="targetDate" value={form.targetDate} onChange={handleChange} style={F.input} required />
         </Field>
+
+        <Field label="Net Date *">
+          <input
+            type="date"
+            name="netDate"
+            value={form.netDate}
+            onChange={handleChange}
+            style={F.input}
+            required
+            min={form.year ? `${form.year}-01-01` : undefined}
+            max={form.year ? `${form.year}-12-31` : undefined}
+            defaultValue={form.year ? `${form.year}-01-01` : undefined}
+          />
+        </Field>
+
+        {form.clientType === 'supplier' && (
+          <div style={F.span2}>
+            <Field label="Expense Category">
+              <select name="expenseCategory" value={form.expenseCategory} onChange={handleChange} style={F.input}>
+                <option value="">— Select category —</option>
+                {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+          </div>
+        )}
+
+        
 
         {liveAging && (
           <div style={{ ...F.span2, padding: '12px 16px', backgroundColor: '#F0FDF4', borderRadius: 10, borderLeft: '3px solid #16A34A' }}>

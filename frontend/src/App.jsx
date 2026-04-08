@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-
 // Pages — all live in src/views/
 import AuthApp        from './views/AuthApp'
 import Accueil        from './views/Accueil'
@@ -8,6 +7,7 @@ import UserManagement from './views/userManagement'
 import Profile        from './views/Profile'
 import ForgotPassword from './views/ForgotPassword'
 import DashboardAccess from './views/DashboardAccess'
+import AIInsightsPage from './views/AIInsightsPage'
 
 // Dashboard layout (sidebar wrapper)
 import DashboardLayout from './views/DashboardLayout'
@@ -33,6 +33,7 @@ function App() {
         <Route path="/users"            element={<UserManagement />} />
         <Route path="/profile"          element={<Profile />} />
         <Route path="/dashboard-access" element={<DashboardAccess />} />
+       
 
         {/* ── Dashboards (all share the sidebar via DashboardLayout) ── */}
         <Route path="/home/dashboard" element={<DashboardLayout />}>
@@ -41,6 +42,7 @@ function App() {
           <Route path="liquidity"     element={<LiquidityDashboard />} />
           <Route path="dso-dpo"       element={<DSODPODashboard />} />
           <Route index element={<Navigate to="profitability" replace />} />
+           <Route path="ai-insights" element={<AIInsightsPage />} />
         </Route>
 
         {/* ── Fallbacks ─────────────────────────────────────────────── */}

@@ -9,7 +9,7 @@ from controllers.accountController   import router as account_router
 from controllers.dataController      import router as data_router
 from controllers.dashboardController import router as dashboard_router
 from controllers.accessController    import router as access_router
-from controllers.ai import router as ai_router
+from controllers.aiInsightController import router as ai_insight_router
 
 app = FastAPI()                                 
 
@@ -29,7 +29,7 @@ app.include_router(account_router)
 app.include_router(data_router)
 app.include_router(dashboard_router)
 app.include_router(access_router) 
-app.include_router(ai_router)  
+app.include_router(ai_insight_router)
 
 @app.get("/")
 def home():

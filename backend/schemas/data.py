@@ -52,7 +52,6 @@ class AssetLiabilityCreate(BaseModel):
     year: int
     month: str
     value: float
-    type: Optional[str] = None
     userId: int
 
 class AssetLiabilityUpdate(BaseModel):
@@ -63,7 +62,7 @@ class AssetLiabilityUpdate(BaseModel):
     year: Optional[int] = None
     month: Optional[str] = None
     value: Optional[float] = None
-    type: Optional[str] = None
+
 
 class AssetLiabilityOut(BaseModel):
     id: int
@@ -76,7 +75,6 @@ class AssetLiabilityOut(BaseModel):
     month: str
     period: str
     value: float
-    type: Optional[str] = None
     createdAt: Optional[datetime] = None
 
     class Config:

@@ -1,15 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client, calculate_aging
-from schemas.data import (
-    RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
-    AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
-    CashFlowCreate, CashFlowUpdate, CashFlowOut,
-    ClientCreate, ClientUpdate, ClientOut,
-)
-from core.dependencies import get_current_user
-from models.user import User
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client
+
 router = APIRouter(tags=["data"])
 
 FISCAL_MONTHS_IN_ORDER = [
@@ -34,7 +27,13 @@ def get_profitability_dashboard(
     # Filter BOTH years to only the active months
     current  = db.query(RevenueExpense).filter(
         RevenueExpense.year == year,
-        RevenueExpense.month.in_(active_months)
+        RevenueExpense.month.in_(active_months),
+        RevenueExpense.type == "Actual"
+    ).all()
+    budget_entries= db.query(RevenueExpense).filter(
+        RevenueExpense.year == year,
+        RevenueExpense.month.in_(active_months),
+        RevenueExpense.type == "Budget"
     ).all()
     previous = db.query(RevenueExpense).filter(
         RevenueExpense.year == year - 1,
@@ -87,6 +86,13 @@ def get_profitability_dashboard(
     net_margin_curr   = round(retained_curr / rev_curr * 100, 2) if rev_curr else 0
     net_margin_prev   = round(retained_prev / rev_prev * 100, 2) if rev_prev else 0
 
+    budget = db.query(RevenueExpense).filter(
+        RevenueExpense.year == year,
+        RevenueExpense.month.in_(active_months),
+        RevenueExpense.type == "Budget"
+    ).all()
+ 
+    # Then replace the pl_summary list with this:
     pl_labels = [
         "Revenue", "Staff Costs", "Overhead Depreciation",
         "Other Overheads", "Total Miscellaneous Overheads",
@@ -97,10 +103,11 @@ def get_profitability_dashboard(
             "label":    lbl,
             "current":  round(sum_by_label(current,  lbl), 2),
             "previous": round(sum_by_label(previous, lbl), 2),
+            "budget":   round(sum_by_label(budget,   lbl), 2),
         }
         for lbl in pl_labels
     ]
-
+ 
     overhead_categories = [
         "Property Costs", "Communication Costs", "Travel And Entertainment",
         "Office Costs", "Computer Costs", "Professional Fees",
@@ -120,11 +127,13 @@ def get_profitability_dashboard(
         rev = sum(e.value for e in current  if e.label == "Revenue" and e.month == m)
         exp = sum(e.value for e in current  if e.label not in ("Revenue",) and e.month == m)
         ebt = sum(e.value for e in current  if e.label == "EBIT"    and e.month == m)
+        bud = sum(e.value for e in budget_entries if e.label == "Revenue" and e.month == m)
         monthly_trend.append({
             "month":    m[:3],
             "revenue":  round(rev, 2),
             "expenses": round(exp, 2),
             "ebit":     round(ebt, 2),
+            "budget":   round(bud, 2),
             "retained": round(sum(e.value for e in current 
                                   if e.label == "Retained Profit/(loss)" and e.month == m), 2),
 })
