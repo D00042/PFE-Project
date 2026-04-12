@@ -82,7 +82,7 @@ export default function DashboardAccess() {
       <div style={styles.hero}>
         <div style={styles.heroAccent} />
         <h1 style={styles.heroTitle}>Dashboard Access Control</h1>
-        <p style={styles.heroSub}>Grant or revoke dashboard access for Team Leaders.</p>
+        <p style={styles.heroSub}>Grant or revoke dashboard access for Team Leaders and Members.</p>
       </div>
 
       <div style={styles.content}>
@@ -91,55 +91,74 @@ export default function DashboardAccess() {
         ) : leaders.length === 0 ? (
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>👥</span>
-            <p style={styles.emptyText}>No Team Leader accounts found.</p>
-            <p style={styles.emptySub}>Create a Team Leader account first to assign permissions.</p>
+            <p style={styles.emptyText}>No user accounts found.</p>
+            <p style={styles.emptySub}>Create Leader or Member accounts first to assign permissions.</p>
           </div>
         ) : (
-          <div style={styles.tableCard}>
-            <div style={styles.tableHeader}>
-              <div style={{ ...styles.col, flex: 2 }}>Team Leader</div>
-              {DASHBOARDS.map(d => (
-                <div key={d.key} style={styles.col}>{d.label}</div>
-              ))}
-            </div>
-
-            {leaders.map((leader, i) => (
-              <div key={leader.id} style={{ ...styles.tableRow, background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                <div style={{ ...styles.col, flex: 2 }}>
-                  <div style={styles.leaderName}>{leader.fullName || leader.email}</div>
-                  <div style={styles.leaderEmail}>{leader.email}</div>
-                  {leader.team && <div style={styles.leaderTeam}>{leader.team}</div>}
-                </div>
-
-                {DASHBOARDS.map(d => {
-                  const isOn = leader.permissions[d.key]
-                  const key  = `${leader.id}-${d.key}`
-                  const busy = !!pending[key]
-                  return (
-                    <div key={d.key} style={styles.col}>
-                      <button
-                        onClick={() => !busy && toggle(leader.id, d.key, isOn)}
-                        style={{
-                          ...styles.toggle,
-                          background: isOn ? "#E8002D" : "#e5e7eb",
-                          opacity: busy ? 0.6 : 1,
-                          cursor: busy ? "wait" : "pointer",
-                        }}
-                      >
-                        <span style={{
-                          ...styles.toggleThumb,
-                          transform: isOn ? "translateX(20px)" : "translateX(2px)",
-                        }} />
-                      </button>
-                      <div style={{ ...styles.toggleLabel, color: isOn ? "#E8002D" : "#9ca3af" }}>
-                        {isOn ? "Enabled" : "Disabled"}
-                      </div>
+          <>
+            {[
+              { roleKey: "leader", roleLabel: "Team Leaders" },
+              { roleKey: "member", roleLabel: "Team Members" },
+            ].map(({ roleKey, roleLabel }) => {
+              const group = leaders.filter(u => u.role === roleKey)
+              if (group.length === 0) return null
+              return (
+                <div key={roleKey} style={styles.groupSection}>
+                  <div style={styles.groupHeading}>
+                    <span style={{ ...styles.roleBadge, background: roleKey === "leader" ? "#1a2b4a" : "#6b7280" }}>
+                      {roleLabel}
+                    </span>
+                    <span style={styles.groupCount}>{group.length} user{group.length > 1 ? "s" : ""}</span>
+                  </div>
+                  <div style={styles.tableCard}>
+                    <div style={styles.tableHeader}>
+                      <div style={{ ...styles.col, flex: 2 }}>User</div>
+                      {DASHBOARDS.map(d => (
+                        <div key={d.key} style={styles.col}>{d.label}</div>
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
+
+                    {group.map((user, i) => (
+                      <div key={user.id} style={{ ...styles.tableRow, background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                        <div style={{ ...styles.col, flex: 2 }}>
+                          <div style={styles.leaderName}>{user.fullName || user.email}</div>
+                          <div style={styles.leaderEmail}>{user.email}</div>
+                          {user.team && <div style={styles.leaderTeam}>{user.team}</div>}
+                        </div>
+
+                        {DASHBOARDS.map(d => {
+                          const isOn = user.permissions[d.key]
+                          const key  = `${user.id}-${d.key}`
+                          const busy = !!pending[key]
+                          return (
+                            <div key={d.key} style={styles.col}>
+                              <button
+                                onClick={() => !busy && toggle(user.id, d.key, isOn)}
+                                style={{
+                                  ...styles.toggle,
+                                  background: isOn ? "#E8002D" : "#e5e7eb",
+                                  opacity: busy ? 0.6 : 1,
+                                  cursor: busy ? "wait" : "pointer",
+                                }}
+                              >
+                                <span style={{
+                                  ...styles.toggleThumb,
+                                  transform: isOn ? "translateX(20px)" : "translateX(2px)",
+                                }} />
+                              </button>
+                              <div style={{ ...styles.toggleLabel, color: isOn ? "#E8002D" : "#9ca3af" }}>
+                                {isOn ? "Enabled" : "Disabled"}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </>
         )}
       </div>
 
@@ -190,6 +209,10 @@ const styles = {
   emptyIcon: { fontSize: "48px", display: "block", marginBottom: "16px" },
   emptyText: { fontSize: "18px", fontWeight: "600", color: "#1a2b4a", margin: "0 0 8px" },
   emptySub: { fontSize: "14px", color: "#9ca3af", margin: 0 },
+  groupSection: { marginBottom: "28px" },
+  groupHeading: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
+  roleBadge: { color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 12px", borderRadius: "20px" },
+  groupCount: { fontSize: "12px", color: "#9ca3af", fontWeight: "600" },
   tableCard: { background: "#fff", borderRadius: "12px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", overflow: "hidden" },
   tableHeader: {
     display: "flex", alignItems: "center",

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import dashboardService from "../services/dashboardService.js";
 import {
   BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, LabelList,
@@ -315,6 +316,9 @@ export default function BalanceSheetDashboard() {
   const [caFilter,  setCaFilter]  = useState("all");
   const [nclFilter, setNclFilter] = useState("all");
   const [clFilter,  setClFilter]  = useState("all");
+  const [interpretation, setInterpretation] = useState("");
+  const [loadingAI, setLoadingAI]           = useState(false);
+  const [aiError, setAiError]               = useState("");
 
 
   const exportPDF = () => window.print();
@@ -349,6 +353,35 @@ export default function BalanceSheetDashboard() {
     } catch { setError("Network error. Is the backend running?"); }
     finally { setLoading(false); }
   };
+
+  const fetchInterpretation = async () => {
+    if (!data) return;
+    setLoadingAI(true);
+    setAiError("");
+    setInterpretation("");
+    try {
+        const { data: result } = await dashboardService.interpretBalanceSheet({
+            year,
+            period,
+            equityRatioCurrent:    data.kpis.equityRatio?.current    ?? 0,
+            equityRatioPrev:       data.kpis.equityRatio?.previous   ?? 0,
+            workingCapitalCurrent: data.kpis.workingCapital?.current ?? 0,
+            workingCapitalPrev:    data.kpis.workingCapital?.previous ?? 0,
+            currentRatioCurrent:   data.kpis.currentRatio?.current   ?? 0,
+            currentRatioPrev:      data.kpis.currentRatio?.previous  ?? 0,
+            debtToEquityCurrent:   data.kpis.debtToEquity?.current   ?? 0,
+            debtToEquityPrev:      data.kpis.debtToEquity?.previous  ?? 0,
+            cashCurrent:           data.kpis.cash?.current           ?? 0,
+            cashPrev:              data.kpis.cash?.previous          ?? 0,
+        });
+        setInterpretation(result.interpretation);
+    } catch (err) {
+        const detail = err?.response?.data?.detail;
+        setAiError(detail ? `Error: ${detail}` : "Failed to generate interpretation. Please try again.");
+    } finally {
+        setLoadingAI(false);
+    }
+};
 
   if (loading) return (
     <div style={S.page}><div style={S.loadingBox}><div style={S.spinner}/>
@@ -462,6 +495,34 @@ const filterChartData = (data, activeKey) =>
           <div style={{ ...S.kpiDelta, color: cashUp ? COLORS.green : COLORS.red }}>{cashUp ? "▲" : "▼"} {fmtK(Math.abs(cash.current - cash.previous))} vs prev</div>
         </div>
       </div>
+
+      {/* ── AI Interpretation Panel ── */}
+<div style={S.aiPanel}>
+    <div style={S.aiPanelHeader}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/statistical-analysis.png" alt="AI" style={{ width: 24, height: 24 }} />
+            <p style={S.aiPanelTitle}>AI Interpretation</p>
+        </div>
+        <button
+            style={{ ...S.aiBtn, opacity: loadingAI ? 0.6 : 1, cursor: loadingAI ? "wait" : "pointer" }}
+            onClick={fetchInterpretation}
+            disabled={loadingAI || !data}
+        >
+            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
+        </button>
+    </div>
+    {aiError && <p style={S.aiError}>{aiError}</p>}
+    {!interpretation && !loadingAI && !aiError && (
+        <p style={S.aiPlaceholder}>Click "Generate Interpretation" to get an AI-powered analysis of the current dashboard metrics.</p>
+    )}
+    {loadingAI && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
+            <div style={S.aiSpinner} />
+            <p style={{ color: COLORS.grey, fontSize: 13 }}>Analyzing your financial data...</p>
+        </div>
+    )}
+    {interpretation && <p style={S.aiText}>{interpretation}</p>}
+</div>
 
       {/* ── Section 1: Overview ── */}
       <div style={S.section}><p style={S.sectionHeading}>Balance Sheet Overview</p></div>
@@ -725,4 +786,12 @@ const S = {
   loadingBox:    { display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh" },
   spinner:       { width:40, height:40, border:"4px solid #E5E7EB", borderTop:`4px solid ${COLORS.navy}`, borderRadius:"50%", animation:"spin 0.8s linear infinite" },
   slicerSelect:  { padding:"4px 10px", borderRadius:8, border:"1px solid #CBD5E1", fontSize:11, color:COLORS.navy, background:"white", cursor:"pointer", fontFamily:"Arial,sans-serif", outline:"none" },
+  aiPanel: { margin: "16px 28px", backgroundColor: "white", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,31,91,0.08)", borderLeft: `4px solid ${COLORS.navy}` },
+  aiPanelHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  aiPanelTitle: { margin: 0, fontSize: 14, fontWeight: 700, color: COLORS.navy },
+  aiBtn: { padding: "8px 18px", backgroundColor: COLORS.navy, color: "white", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  aiText: { margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.7 },
+  aiPlaceholder: { margin: 0, fontSize: 13, color: COLORS.grey, fontStyle: "italic" },
+  aiError: { margin: 0, fontSize: 13, color: COLORS.red },
+  aiSpinner: { width: 18, height: 18, border: "3px solid #E5E7EB", borderTop: `3px solid ${COLORS.navy}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 },
 };

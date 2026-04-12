@@ -46,6 +46,33 @@ const dashboardService = {
     return handleResponse(response);
 },
 
+  interpretBalanceSheet: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/ai/interpret/balance-sheet`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+},
+
+  interpretLiquidity: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/ai/interpret/liquidity`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+},
+
+  interpretDsoDpo: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/ai/interpret/dso-dpo`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+},
+
 
   exportToPDF: () => {
     window.print();

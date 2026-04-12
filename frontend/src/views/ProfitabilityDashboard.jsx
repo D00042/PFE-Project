@@ -157,8 +157,9 @@ const [aiError, setAiError]               = useState("");
                 monthlyTrend: data.monthlyTrend ?? [],
             });
         setInterpretation(result.interpretation);
-    } catch {
-        setAiError("Failed to generate interpretation. Please try again.");
+    } catch (err) {
+        const detail = err?.response?.data?.detail;
+        setAiError(detail ? `Error: ${detail}` : "Failed to generate interpretation. Please try again.");
     } finally {
         setLoadingAI(false);
     }

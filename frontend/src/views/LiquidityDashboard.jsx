@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import dashboardService from "../services/dashboardService.js";
 import {
   LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ReferenceLine,
   ComposedChart, Cell,
 } from "recharts";
@@ -60,20 +61,25 @@ export default function LiquidityDashboard() {
   const navigate    = useNavigate();
   const currentYear = new Date().getFullYear();
 
-  const [year,    setYear]    = useState(currentYear);
-  const [period,  setPeriod]  = useState("P12");
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+  const [year,        setYear]        = useState(currentYear);
+  const [compareYear, setCompareYear] = useState(currentYear - 1);
+  const [period,      setPeriod]      = useState("P12");
+  const [data,        setData]        = useState(null);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+  const [interpretation, setInterpretation] = useState("");
+  const [loadingAI, setLoadingAI]           = useState(false);
+  const [aiError, setAiError]               = useState("");
 
-  useEffect(() => { fetchData(); }, [year, period]);
+  useEffect(() => { setCompareYear(year - 1); }, [year]);
+  useEffect(() => { fetchData(); }, [year, compareYear, period]);
 
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("access_token");
       const res = await fetch(
-        `${API_URL}/dashboard/liquidity?year=${year}&period=${period}`,
+        `${API_URL}/dashboard/liquidity?year=${year}&period=${period}&compare_year=${compareYear}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) { setError("Failed to load data."); return; }
@@ -84,6 +90,33 @@ export default function LiquidityDashboard() {
       setLoading(false);
     }
   };
+
+  const fetchInterpretation = async () => {
+    if (!data) return;
+    setLoadingAI(true);
+    setAiError("");
+    setInterpretation("");
+    try {
+        const { data: result } = await dashboardService.interpretLiquidity({
+            year,
+            period,
+            cashRatioCurrent:    data.kpis.cashRatio?.current    ?? 0,
+            cashRatioPrev:       data.kpis.cashRatio?.previous   ?? 0,
+            freeCashFlowCurrent: data.kpis.freeCashFlow?.current ?? 0,
+            freeCashFlowPrev:    data.kpis.freeCashFlow?.previous ?? 0,
+            closingCashCurrent:  data.kpis.closingCash?.current  ?? 0,
+            closingCashPrev:     data.kpis.closingCash?.previous ?? 0,
+            openingCashCurrent:  data.kpis.openingCash?.current  ?? 0,
+            openingCashPrev:     data.kpis.openingCash?.previous ?? 0,
+        });
+        setInterpretation(result.interpretation);
+    } catch (err) {
+        const detail = err?.response?.data?.detail;
+        setAiError(detail ? `Error: ${detail}` : "Failed to generate interpretation. Please try again.");
+    } finally {
+        setLoadingAI(false);
+    }
+};
 
   if (loading) return (
     <div style={S.page}>
@@ -220,15 +253,58 @@ export default function LiquidityDashboard() {
   })}
 </div>
 
+      {/* ── AI Interpretation Panel ── */}
+<div style={S.aiPanel}>
+    <div style={S.aiPanelHeader}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/statistical-analysis.png" alt="AI" style={{ width: 24, height: 24 }} />
+            <p style={S.aiPanelTitle}>AI Interpretation</p>
+        </div>
+        <button
+            style={{ ...S.aiBtn, opacity: loadingAI ? 0.6 : 1, cursor: loadingAI ? "wait" : "pointer" }}
+            onClick={fetchInterpretation}
+            disabled={loadingAI || !data}
+        >
+            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
+        </button>
+    </div>
+    {aiError && <p style={S.aiError}>{aiError}</p>}
+    {!interpretation && !loadingAI && !aiError && (
+        <p style={S.aiPlaceholder}>Click "Generate Interpretation" to get an AI-powered analysis of the current dashboard metrics.</p>
+    )}
+    {loadingAI && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
+            <div style={S.aiSpinner} />
+            <p style={{ color: C.grey, fontSize: 13 }}>Analyzing your financial data...</p>
+        </div>
+    )}
+    {interpretation && <p style={S.aiText}>{interpretation}</p>}
+</div>
+
       {/* ── Waterfall ────────────────────────────────────────────────────── */}
       <div style={{ padding: "24px 28px 8px" }}>
         <div style={S.chartCard}>
-          <p style={S.chartTitle}>Cash Flow {year - 1} – {year}</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+            <p style={{ ...S.chartTitle, marginBottom: 0 }}>Cash Flow {compareYear} – {year}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: C.navy, whiteSpace: "nowrap" }}>Compare to:</span>
+              <select
+                value={compareYear}
+                onChange={e => setCompareYear(Number(e.target.value))}
+                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 12, fontFamily: "Arial, sans-serif", color: "#374151", background: "white", cursor: "pointer" }}
+              >
+                {Array.from({ length: 5 }, (_, i) => year - 1 - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div style={S.legendRow}>
             <span style={{ ...S.dot(C.positive), borderRadius: 2 }} />
-            <span style={S.legendText}>Current year</span>
-            <span style={{ display: "inline-block", width: 24, height: 2, background: C.navy, verticalAlign: "middle", margin: "0 4px 0 12px" }} />
-            <span style={S.legendText}>Previous year</span>
+            <span style={S.legendText}>Current year ({year})</span>
+            <span style={{ display: "inline-block", width: 24, height: 2, background: C.navy, borderTop: `2px dashed ${C.navy}`, verticalAlign: "middle", margin: "0 4px 0 12px" }} />
+            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: C.navy, verticalAlign: "middle", marginRight: 4 }} />
+            <span style={S.legendText}>Compare year ({compareYear})</span>
           </div>
           {waterfall.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 0", color: C.grey, fontSize: 13 }}>
@@ -236,20 +312,31 @@ export default function LiquidityDashboard() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={waterfall} margin={{ bottom: 48, top: 24, left: 10, right: 10 }}>
+              <ComposedChart data={waterfall} margin={{ bottom: 48, top: 24, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" interval={0} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine y={0} stroke="#CBD5E1" />
                 <Bar dataKey="base" stackId="wf" fill="transparent" legendType="none" />
-                <Bar dataKey="bar"  stackId="wf" radius={[3, 3, 0, 0]}
+                <Bar dataKey="bar" stackId="wf" name="Current Year" radius={[3, 3, 0, 0]}
                   label={{ position: "top", fontSize: 9, formatter: fmt }}>
                   {waterfall.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} />
                   ))}
                 </Bar>
-              </BarChart>
+                <Line
+                  type="linear"
+                  dataKey="prev"
+                  name="Previous Year"
+                  stroke={C.navy}
+                  strokeWidth={2}
+                  strokeDasharray="5 3"
+                  dot={{ r: 4, fill: C.navy, stroke: "white", strokeWidth: 2 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
@@ -404,4 +491,12 @@ const S = {
   legendText:  { color: "#374151", marginRight: 6 },
   loadingBox:  { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" },
   spinner:     { width: 40, height: 40, border: "4px solid #E5E7EB", borderTop: `4px solid ${C.navy}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+  aiPanel: { margin: "16px 28px", backgroundColor: "white", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(9,42,94,0.08)", borderLeft: `4px solid ${C.navy}` },
+  aiPanelHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  aiPanelTitle: { margin: 0, fontSize: 14, fontWeight: 700, color: C.navy },
+  aiBtn: { padding: "8px 18px", backgroundColor: C.navy, color: "white", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  aiText: { margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.7 },
+  aiPlaceholder: { margin: 0, fontSize: 13, color: C.grey, fontStyle: "italic" },
+  aiError: { margin: 0, fontSize: 13, color: C.red },
+  aiSpinner: { width: 18, height: 18, border: "3px solid #E5E7EB", borderTop: `3px solid ${C.navy}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 },
 };
