@@ -18,9 +18,7 @@ const REVENUE_EXPENSE_CODES = {
   'PLMT100000T': { label: 'Revenue' },
   'PLMT120000T': { label: 'Revenue' },
   'PLMT130000T': { label: 'Revenue' },
-  'PLMT299999T': { label: 'Gross Margin' },
   'PLMT300000T': { label: 'Direct operating costs' },
-  'PLMT399999T': { label: 'Gross Profit 1' },
   'PLMT511000T': { label: 'Staff Costs' },
   'PLMT512000T': { label: 'Overhead Depreciation' },
   'PLMT514000T': { label: 'Other Overheads' },
@@ -32,9 +30,7 @@ const REVENUE_EXPENSE_CODES = {
   'PLMT514800T': { label: 'Other Overheads', category: 'Professional Fees' },
   'PLMT514900T': { label: 'Total Miscellaneous Overheads' },
   'PLMT590300T': { label: 'EBIT' },
-  'PLMT590100T': { label: 'EBT' },
   'PLMT600500T': { label: 'Interest' },
-  'PLMT799999T': { label: 'EBT' },
   'PLMT888555T': { label: 'Profit/(loss) after tax' },
   'PLMT899999T': { label: 'Retained Profit/(loss)' },
 };
@@ -253,6 +249,10 @@ export default function DataManagement() {
   // ── CONTROLLER CALL: create or update an entry ────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true); setError('');
+
+    if (activeCategory === 'clients' && !form.clientName?.trim()) {
+      setError('Client name is required.'); setLoading(false); return;
+    }
 
     const yearVal = parseInt(form.year);
     if (!form.year || isNaN(yearVal)) {
@@ -680,7 +680,7 @@ export default function DataManagement() {
             <div style={S.modalBody}>
               {message && <div style={{ ...S.msgSuccess, marginBottom: 16 }}>{message}</div>}
               {error   && <div style={{ ...S.msgError,   marginBottom: 16 }}>{error}</div>}
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 {renderFields()}
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                   <button type="button" onClick={() => setShowModal(false)} style={S.cancelBtn}>Cancel</button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import accountService from '../services/accountService';
@@ -17,6 +17,9 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [form, setForm] = useState({ email:'', password:'', role:'member', fullName:'', telephone:'', team:'' });
   const [formErrors, setFormErrors] = useState({});
+  const [filterRole,   setFilterRole]   = useState('');
+  const [filterTeam,   setFilterTeam]   = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -80,6 +83,7 @@ export default function UserManagement() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(p => ({ ...p, [name]: value }));
+    if (name === 'team' && value) setFormErrors(p => ({ ...p, team: '' }));
     // live validation for create mode
     if (modalMode === 'create') {
       if (name === 'telephone') setFormErrors(p => ({ ...p, telephone: validateTelephone(value) }));
@@ -90,6 +94,11 @@ export default function UserManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!form.team) {
+      setFormErrors(p => ({ ...p, team: 'Team is required.' }));
+      return;
+    }
 
     if (modalMode === 'create') {
       const emailErr = validateEmail(form.email);
@@ -139,6 +148,16 @@ export default function UserManagement() {
     }
   };
 
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      if (filterRole   && u.role !== filterRole) return false;
+      if (filterTeam   && u.team !== filterTeam) return false;
+      if (filterStatus === 'active'   && u.is_active === false) return false;
+      if (filterStatus === 'inactive' && u.is_active !== false) return false;
+      return true;
+    });
+  }, [users, filterRole, filterTeam, filterStatus]);
+
   const roleBadge = (role) => {
     if (role === 'manager') return { backgroundColor:'#092A5E', color:'white' };
     if (role === 'leader')  return { backgroundColor:'#70CBF4', color:'white' };
@@ -166,9 +185,34 @@ export default function UserManagement() {
       </div>
 
       <div style={S.body}>
-        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:20 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
           <button onClick={openCreate} style={S.addBtn}>+ Create New Account</button>
           <button onClick={fetchUsers} style={S.refreshBtn}>↺ Refresh</button>
+        </div>
+
+        {/* ── Filter bar ── */}
+        <div style={S.filterBar}>
+          <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={S.filterSelect}>
+            <option value="">All Roles</option>
+            <option value="member">Team Member</option>
+            <option value="leader">Team Leader</option>
+            <option value="manager">Manager</option>
+          </select>
+          <select value={filterTeam} onChange={e => setFilterTeam(e.target.value)} style={S.filterSelect}>
+            <option value="">All Teams</option>
+            {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={S.filterSelect}>
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          {(filterRole || filterTeam || filterStatus) && (
+            <button
+              onClick={() => { setFilterRole(''); setFilterTeam(''); setFilterStatus(''); }}
+              style={S.clearBtn}
+            >✕ Clear</button>
+          )}
         </div>
         {message && <div style={S.msgSuccess}>{message}</div>}
         {error   && <div style={S.msgError}>{error}</div>}
@@ -182,9 +226,9 @@ export default function UserManagement() {
               <tbody>
                 {loading && users.length === 0 ? (
                   <tr><td colSpan="8" style={S.tdEmpty}>Loading…</td></tr>
-                ) : users.length === 0 ? (
-                  <tr><td colSpan="8" style={S.tdEmpty}>No accounts found</td></tr>
-                ) : users.map((u, i) => (
+                ) : filteredUsers.length === 0 ? (
+                  <tr><td colSpan="8" style={S.tdEmpty}>No accounts match the current filters</td></tr>
+                ) : filteredUsers.map((u, i) => (
                   <tr key={u.id} style={{ backgroundColor: i%2===0?'#F9FAFB':'white' }}>
                     <td style={S.td}>{u.id}</td>
                     <td style={S.td}>{u.fullName||'—'}</td>
@@ -225,7 +269,7 @@ export default function UserManagement() {
               {message && <div style={{ ...S.msgSuccess, marginBottom:12 }}>{message}</div>}
               {error   && <div style={{ ...S.msgError,   marginBottom:12 }}>{error}</div>}
 
-              <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <form onSubmit={handleSubmit} noValidate style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
                 {/* ── Create-only fields ── */}
                 {modalMode === 'create' && (
@@ -297,11 +341,12 @@ export default function UserManagement() {
                   </select>
                 </Field>
 
-                <Field label="Team">
-                  <select name="team" value={form.team} onChange={handleChange} style={F.input}>
+                <Field label="Team *">
+                  <select name="team" value={form.team} onChange={handleChange} style={{ ...F.input, borderColor: formErrors.team ? '#D40E14' : '#E5E7EB' }}>
                     <option value="">— Select team —</option>
                     {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
+                  {formErrors.team && <span style={F.err}>{formErrors.team}</span>}
                 </Field>
 
                 <div style={{ display:'flex', gap:12, marginTop:8 }}>
@@ -358,6 +403,9 @@ const S = {
   badge:         { padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700 },
   editBtn:       { padding:'6px 14px', backgroundColor:'#70CBF4', color:'white', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' },
   toggleBtn:     { padding:'6px 14px', color:'white', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer' },
+  filterBar:     { display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, alignItems:'center' },
+  filterSelect:  { padding:'9px 14px', border:'2px solid #E5E7EB', borderRadius:10, fontSize:13, fontFamily:'Arial, sans-serif', outline:'none', color:'#213547', backgroundColor:'white', cursor:'pointer' },
+  clearBtn:      { padding:'9px 14px', border:'2px solid #D40E14', borderRadius:10, fontSize:13, fontWeight:700, color:'#D40E14', backgroundColor:'white', cursor:'pointer' },
   overlay:       { position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, zIndex:50, overflowY:'auto' },
   modal:         { backgroundColor:'white', borderRadius:24, boxShadow:'0 20px 60px rgba(0,0,0,0.2)', width:'100%', maxWidth:500, margin:'auto' },
   modalHeader:   { padding:'24px 32px', backgroundColor:'#092A5E', borderRadius:'24px 24px 0 0' },
