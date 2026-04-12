@@ -15,7 +15,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
+    allow_origins=["*"],
     
     allow_credentials=True,
     allow_methods=["*"],
@@ -23,6 +23,15 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+# Add columns that may be missing from pre-existing tables
+with engine.connect() as _conn:
+    _conn.execute(__import__("sqlalchemy").text("""
+        ALTER TABLE dashboard_permissions
+            ADD COLUMN IF NOT EXISTS granted_by INTEGER REFERENCES users(id),
+            ADD COLUMN IF NOT EXISTS granted_at TIMESTAMP DEFAULT NOW()
+    """))
+    _conn.commit()
 
 app.include_router(auth_router)
 app.include_router(account_router)
