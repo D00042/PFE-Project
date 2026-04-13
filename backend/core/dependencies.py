@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user import User
+from models.account import Account
 from core.security import verify_token
 
 security = HTTPBearer()
@@ -19,15 +20,15 @@ def get_current_user(
     if email is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    user = db.query(User).filter(User.email == email).first()
+    account = db.query(Account).filter(Account.email == email).first()
 
-    if not user:
+    if not account:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if not user.is_active:
+    if not account.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
 
-    return user
+    return account.user
 
 
 def require_roles(allowed_roles: list):

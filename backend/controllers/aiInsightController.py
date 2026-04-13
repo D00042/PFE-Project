@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database.db import get_db
 from models.ai_insight import AIInsight
 from models.data_models import RevenueExpense
-from core.dependencies import get_current_user
+from core.dependencies import get_current_user, require_roles
 from models.user import User
 from pydantic import BaseModel
 from typing import Optional

@@ -24,6 +24,14 @@ function Spinner() {
 
 // year and period come directly from the profitability dashboard filters
 export default function GlobalAIPanel({ year, period }) {
+  // Check user role from localStorage
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const canGenerate = user && (user.role === "leader" || user.role === "manager");
+
+  // Hide panel entirely for members
+  if (!canGenerate) return null;
+
   const [open,    setOpen]    = useState(false);
   const [result,  setResult]  = useState(null);
   const [savedAt, setSavedAt] = useState(null);

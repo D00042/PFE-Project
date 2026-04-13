@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import accessService from "../services/accessService";
+
+const PERM_KEY = {
+  "/home/dashboard/profitability": "profitability",
+  "/home/dashboard/balance-sheet": "balance_sheet",
+  "/home/dashboard/liquidity":     "liquidity",
+  "/home/dashboard/dso-dpo":       "dpo_dso",
+  "/home/dashboard/ai-insights":   "ai_insights",
+};
 const DASHBOARDS = [
   {
-    label: "Profitability",
-    path:  "/home/dashboard/profitability",
+    label:   "Profitability",
+    path:    "/home/dashboard/profitability",
+    permKey: "profitability",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -13,8 +23,9 @@ const DASHBOARDS = [
     ),
   },
   {
-    label: "Balance Sheet",
-    path:  "/home/dashboard/balance-sheet",
+    label:   "Balance Sheet",
+    path:    "/home/dashboard/balance-sheet",
+    permKey: "balance_sheet",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -25,45 +36,48 @@ const DASHBOARDS = [
       </svg>
     ),
   },
-
   {
-  label: "Liquidity",
-  path:  "/home/dashboard/liquidity",
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-         width="20" height="20">
-      <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/>
-      <path d="M12 8v4l3 3"/>
-    </svg>
-  ),
-},
-{
-  label: "DSO & DPO",
-  path:  "/home/dashboard/dso-dpo",
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-         width="20" height="20">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M12 6v2M12 16v2M8.5 9a3.5 3.5 0 0 1 7 0c0 2-3.5 3-3.5 3s-3.5 1-3.5 3a3.5 3.5 0 0 0 7 0"/>
-    </svg>
-  ),
-},
-{
-  label: "AI Insights",
-  path:  "/home/dashboard/ai-insights",
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-         width="20" height="20">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M12 8v4M12 16h.01"/>
-    </svg>
-  ),
-},
-
+    label:   "Liquidity",
+    path:    "/home/dashboard/liquidity",
+    permKey: "liquidity",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+           width="20" height="20">
+        <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+    ),
+  },
+  {
+    label:   "DSO & DPO",
+    path:    "/home/dashboard/dso-dpo",
+    permKey: "dpo_dso",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+           width="20" height="20">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 6v2M12 16v2M8.5 9a3.5 3.5 0 0 1 7 0c0 2-3.5 3-3.5 3s-3.5 1-3.5 3a3.5 3.5 0 0 0 7 0"/>
+      </svg>
+    ),
+  },
+  {
+    label:   "AI Insights",
+    path:    "/home/dashboard/ai-insights",
+    permKey: "ai_insights",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+           width="20" height="20">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v4M12 16h.01"/>
+      </svg>
+    ),
+  },
 ];
+
+
 
 
 const C = {
@@ -86,11 +100,44 @@ const TRANSITION       = "0.22s cubic-bezier(0.4, 0, 0.2, 1)";
 
 
 export default function DashboardLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed,    setCollapsed]    = useState(false);
+  const [permissions,  setPermissions]  = useState(null);  // null = loading
   const navigate  = useNavigate();
   const location  = useLocation();
 
+  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; } })();
+  const isManager = user.role === "manager";
+
+  useEffect(() => {
+    if (isManager) {
+      // Managers see everything — no need to fetch
+      setPermissions({ profitability: true, balance_sheet: true, liquidity: true, dpo_dso: true });
+      return;
+    }
+    accessService.getMyPermissions()
+      .then(({ data }) => setPermissions(data))
+      .catch(() => setPermissions({ profitability: false, balance_sheet: false, liquidity: false, dpo_dso: false }));
+  }, []);
+
   const sidebarWidth = collapsed ? SIDEBAR_NARROW : SIDEBAR_WIDE;
+
+  // Dashboards this user is allowed to see
+  const canViewAIInsights = user.role === "leader" || user.role === "manager";
+  const allowedDashboards = permissions
+    ? DASHBOARDS.filter(d => {
+        if (d.permKey === "ai_insights") return canViewAIInsights;
+        return permissions[d.permKey];
+      })
+    : [];
+
+  // Check if the current route is accessible
+  const currentPermKey = PERM_KEY[location.pathname];
+  const isAccessDenied =
+    permissions &&
+    currentPermKey && (
+      (currentPermKey === "ai_insights" && !canViewAIInsights) ||
+      (currentPermKey !== "ai_insights" && !permissions[currentPermKey])
+    );
 
   return (
     <div style={S.root}>
@@ -133,7 +180,18 @@ export default function DashboardLayout() {
 
         {/* Dashboard nav items */}
         <nav style={S.nav}>
-          {DASHBOARDS.map(({ label, path, icon }) => {
+          {permissions === null ? (
+            // Loading state — show skeleton placeholders
+            [1,2,3,4].map(i => (
+              <div key={i} style={{ height: 40, margin: "2px 8px", borderRadius: 10, background: "rgba(255,255,255,0.06)" }} />
+            ))
+          ) : allowedDashboards.length === 0 ? (
+            !collapsed && (
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", padding: "8px 18px", margin: 0 }}>
+                No dashboards assigned
+              </p>
+            )
+          ) : allowedDashboards.map(({ label, path, icon }) => {
             const isActive = location.pathname === path;
             return (
               <button
@@ -147,26 +205,12 @@ export default function DashboardLayout() {
                   paddingLeft:    collapsed ? 0 : 18,
                 }}
               >
-                {/* Active indicator strip */}
-                {isActive && (
-                  <span style={S.activeStrip} />
-                )}
-
-                {/* Icon */}
-                <span style={{
-                  ...S.navIcon,
-                  color: isActive ? C.accent : C.text,
-                }}>
+                {isActive && <span style={S.activeStrip} />}
+                <span style={{ ...S.navIcon, color: isActive ? C.accent : C.text }}>
                   {icon}
                 </span>
-
-                {/* Label — hidden when collapsed */}
                 {!collapsed && (
-                  <span style={{
-                    ...S.navLabel,
-                    color: isActive ? C.white : C.text,
-                    fontWeight: isActive ? 700 : 400,
-                  }}>
+                  <span style={{ ...S.navLabel, color: isActive ? C.white : C.text, fontWeight: isActive ? 700 : 400 }}>
                     {label}
                   </span>
                 )}
@@ -204,13 +248,28 @@ export default function DashboardLayout() {
 
       {/* ── Main content (the active dashboard renders here) ─────────────── */}
       <main style={S.main}>
-        {/*
-          <Outlet /> is React Router's way of saying:
-          "render whatever child route matches here".
-          The active dashboard page (Profitability, BalanceSheet, etc.)
-          fills this space automatically.
-        */}
-        <Outlet />
+        {isAccessDenied ? (
+          <div style={S.deniedWrap}>
+            <div style={S.deniedCard}>
+              <div style={S.deniedIcon}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#D40E14" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="48" height="48">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+              </div>
+              <h2 style={S.deniedTitle}>Access Restricted</h2>
+              <p style={S.deniedSub}>You don't have permission to view this dashboard. Please contact your manager to request access.</p>
+              <button style={S.deniedBtn} onClick={() => {
+                const first = allowedDashboards[0];
+                navigate(first ? first.path : "/home");
+              }}>
+                {allowedDashboards[0] ? "Go to my dashboards" : "Back to Home"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
 
     </div>
@@ -361,8 +420,26 @@ const S = {
   // ── Main content area ──
   main: {
     flex:        1,
-    overflowY:   "auto",      // each dashboard scrolls independently
+    overflowY:   "auto",
     height:      "100vh",
-    minWidth:    0,           // prevents flex overflow
+    minWidth:    0,
+  },
+
+  // ── Access denied ──
+  deniedWrap: {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    height: "100%", background: "linear-gradient(160deg, #D6E8F7 0%, #EAF3FB 40%, #F5F9FD 100%)",
+  },
+  deniedCard: {
+    background: "white", borderRadius: 20, padding: "48px 48px 40px",
+    boxShadow: "0 4px 24px rgba(9,42,94,0.12)", textAlign: "center", maxWidth: 440,
+  },
+  deniedIcon:  { marginBottom: 20 },
+  deniedTitle: { color: "#092A5E", fontSize: 22, fontWeight: 800, margin: "0 0 12px" },
+  deniedSub:   { color: "#6B7280", fontSize: 14, lineHeight: 1.6, margin: "0 0 28px" },
+  deniedBtn: {
+    padding: "10px 28px", background: "#092A5E", color: "white",
+    border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700,
+    cursor: "pointer", fontFamily: "Arial, sans-serif",
   },
 };

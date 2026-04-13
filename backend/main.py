@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from database.db import engine, Base
 from models import user
 from models import data_models
-from models import dashboard_permission       
+from models import dashboard_permission
+from models.account import Account  # noqa: F401 — registers table with SQLAlchemy metadata
 from controllers.authController      import router as auth_router
 from controllers.accountController   import router as account_router
 from controllers.dataController      import router as data_router
@@ -16,7 +17,6 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
-    
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

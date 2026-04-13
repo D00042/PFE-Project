@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 
@@ -56,7 +56,7 @@ function Accueil() {
       route: '/users', color: '#092A5E', lightBg: '#EEF1F7', label: 'Manage Accounts',
     },
     {
-      key: 'dashboard', roles: ['leader', 'manager'],
+      key: 'dashboard', roles: ['member', 'leader', 'manager'],
       title: 'Dashboards',
       description: 'Consult interactive financial dashboards — Profitability, Balance Sheet, Liquidity Analysis, and DPO & DSO.',
       icon: (

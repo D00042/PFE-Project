@@ -122,6 +122,14 @@ function RecommendationResult({ data, targetPeriod, savedAt }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 export default function ProfitabilityAIPanel({ year, period }) {
+  // Check user role from localStorage
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const canGenerate = user && (user.role === "leader" || user.role === "manager");
+
+  // Hide panel entirely for members
+  if (!canGenerate) return null;
+
   const [open,          setOpen]          = useState(false);
   const [tab,           setTab]           = useState("interpretation");
 

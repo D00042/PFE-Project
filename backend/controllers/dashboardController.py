@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
-from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client
-
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client, calculate_aging
+from schemas.data import (
+    RevenueExpenseCreate, RevenueExpenseUpdate, RevenueExpenseOut,
+    AssetLiabilityCreate, AssetLiabilityUpdate, AssetLiabilityOut,
+    CashFlowCreate, CashFlowUpdate, CashFlowOut,
+    ClientCreate, ClientUpdate, ClientOut,
+)
+from core.dependencies import get_current_user
+from models.user import User
 router = APIRouter(tags=["data"])
 
 FISCAL_MONTHS_IN_ORDER = [
@@ -27,13 +34,7 @@ def get_profitability_dashboard(
     # Filter BOTH years to only the active months
     current  = db.query(RevenueExpense).filter(
         RevenueExpense.year == year,
-        RevenueExpense.month.in_(active_months),
-        RevenueExpense.type == "Actual"
-    ).all()
-    budget_entries= db.query(RevenueExpense).filter(
-        RevenueExpense.year == year,
-        RevenueExpense.month.in_(active_months),
-        RevenueExpense.type == "Budget"
+        RevenueExpense.month.in_(active_months)
     ).all()
     previous = db.query(RevenueExpense).filter(
         RevenueExpense.year == year - 1,
@@ -86,13 +87,6 @@ def get_profitability_dashboard(
     net_margin_curr   = round(retained_curr / rev_curr * 100, 2) if rev_curr else 0
     net_margin_prev   = round(retained_prev / rev_prev * 100, 2) if rev_prev else 0
 
-    budget = db.query(RevenueExpense).filter(
-        RevenueExpense.year == year,
-        RevenueExpense.month.in_(active_months),
-        RevenueExpense.type == "Budget"
-    ).all()
- 
-    # Then replace the pl_summary list with this:
     pl_labels = [
         "Revenue", "Staff Costs", "Overhead Depreciation",
         "Other Overheads", "Total Miscellaneous Overheads",
@@ -103,11 +97,10 @@ def get_profitability_dashboard(
             "label":    lbl,
             "current":  round(sum_by_label(current,  lbl), 2),
             "previous": round(sum_by_label(previous, lbl), 2),
-            "budget":   round(sum_by_label(budget,   lbl), 2),
         }
         for lbl in pl_labels
     ]
- 
+
     overhead_categories = [
         "Property Costs", "Communication Costs", "Travel And Entertainment",
         "Office Costs", "Computer Costs", "Professional Fees",
@@ -127,13 +120,11 @@ def get_profitability_dashboard(
         rev = sum(e.value for e in current  if e.label == "Revenue" and e.month == m)
         exp = sum(e.value for e in current  if e.label not in ("Revenue",) and e.month == m)
         ebt = sum(e.value for e in current  if e.label == "EBIT"    and e.month == m)
-        bud = sum(e.value for e in budget_entries if e.label == "Revenue" and e.month == m)
         monthly_trend.append({
             "month":    m[:3],
             "revenue":  round(rev, 2),
             "expenses": round(exp, 2),
             "ebit":     round(ebt, 2),
-            "budget":   round(bud, 2),
             "retained": round(sum(e.value for e in current 
                                   if e.label == "Retained Profit/(loss)" and e.month == m), 2),
 })
@@ -378,15 +369,16 @@ def periods_up_to_liq(period: str):
 
 @router.get("/dashboard/liquidity")
 def get_liquidity_dashboard(
-    year:   int = 2025,
-    period: str = "P12",
+    year:         int = 2025,
+    period:       str = "P12",
+    compare_year: int = None,
     db: Session = Depends(get_db),
 ):
     from collections import defaultdict
     from sqlalchemy import func
 
     active_periods = periods_up_to_liq(period)
-    prev_year      = year - 1
+    prev_year      = compare_year if compare_year is not None else year - 1
 
     # ── Cash flow rows ────────────────────────────────────────────────────
     cf_curr = db.query(CashFlow).filter(
@@ -462,14 +454,18 @@ def get_liquidity_dashboard(
         })
 
     # ── Waterfall ─────────────────────────────────────────────────────────
-    label_totals = defaultdict(float)
+    label_totals      = defaultdict(float)
+    label_totals_prev = defaultdict(float)
     for r in cf_curr:
         label_totals[r.label] += r.value
+    for r in cf_prev:
+        label_totals_prev[r.label] += r.value
 
     waterfall_data = [
         {
             "name":  label,
             "value": round(label_totals.get(label, 0), 2),
+            "prev":  round(label_totals_prev.get(label, 0), 2),
             "type":  "total" if label in TOTAL_LABELS_LIQ else "bar",
         }
         for label in WATERFALL_ORDER
@@ -533,7 +529,7 @@ PERIOD_TO_IDX_DSO = {f"P{i+1}": i for i in range(12)}
 
 @router.get("/dashboard/dso-dpo")
 def get_dso_dpo_dashboard(
-    year:   int = 2025,
+    year: int = 2025,
     period: str = "P12",
     db: Session = Depends(get_db),
 ):
@@ -590,13 +586,13 @@ def get_dso_dpo_dashboard(
         "61-90 days", "90-180 days", ">180 days"
     ]
 
-    # Customer aging — current year only (single bars per bucket)
+    # ── Customer aging ────────────────────────────────────────────────────
     customer_aging = [
         {"bucket": b, "amount": round(sum(c.amount for c in customers_curr if c.agingDays == b), 2)}
         for b in aging_buckets
     ]
 
-    # Supplier aging — 3 years grouped by bucket
+    # ── Supplier aging grouped by year ────────────────────────────────────
     supplier_aging_by_year = []
     for bucket in aging_buckets:
         curr  = sum(s.amount for s in suppliers_curr  if s.agingDays == bucket)
@@ -610,12 +606,13 @@ def get_dso_dpo_dashboard(
                 str(prev2_year): round(prev2, 2),
             })
 
-    # Supplier aging pie (current year)
+    # ── Supplier aging pie (current year) ─────────────────────────────────
     supplier_aging = [
         {"bucket": b, "amount": round(sum(s.amount for s in suppliers_curr if s.agingDays == b), 2)}
         for b in aging_buckets
     ]
 
+    # ── Top clients ───────────────────────────────────────────────────────
     def top_clients(clients, n):
         totals = {}
         for c in clients:
@@ -628,6 +625,7 @@ def get_dso_dpo_dashboard(
     top_customers = top_clients(customers_curr, 10)
     top_suppliers = top_clients(suppliers_curr, 5)
 
+    # ── Delay distributions ───────────────────────────────────────────────
     customer_delay_dist = [
         {"bucket": b, "count": sum(1 for c in customers_curr if c.agingDays == b)}
         for b in aging_buckets
@@ -636,6 +634,41 @@ def get_dso_dpo_dashboard(
         {"bucket": b, "count": sum(1 for s in suppliers_curr if s.agingDays == b)}
         for b in aging_buckets
     ]
+
+    # ── Per-supplier aging breakdown for connected pie chart ──────────────
+    supplier_details = {}
+    for s in suppliers_curr:
+        name   = s.clientName
+        bucket = s.agingDays or "Not due"
+        if name not in supplier_details:
+            supplier_details[name] = {}
+        supplier_details[name][bucket] = supplier_details[name].get(bucket, 0) + s.amount
+
+    supplier_aging_detail = {
+        name: [
+            {"bucket": bucket, "amount": round(amount, 2)}
+            for bucket, amount in buckets.items()
+            if amount > 0
+        ]
+        for name, buckets in supplier_details.items()
+    }
+
+    # ── Supplier expense category breakdown ───────────────────────────────
+    expense_cat_totals = {}
+    for s in suppliers_curr:
+        cat = s.expenseCategory or "Uncategorized"
+        expense_cat_totals[cat] = expense_cat_totals.get(cat, 0) + s.amount
+
+    supplier_expense_categories = [
+        {"category": cat, "amount": round(amt, 2)}
+        for cat, amt in sorted(expense_cat_totals.items(), key=lambda x: x[1], reverse=True)
+        if amt > 0
+    ]
+
+    # ── Counts ────────────────────────────────────────────────────────────
+    total_clients   = len(customers_curr) + len(suppliers_curr)
+    total_customers = len(customers_curr)
+    total_suppliers = len(suppliers_curr)
 
     total_customer_overdue = round(sum(c.amount for c in customers_curr if c.agingDays != "Not due"), 2)
     total_supplier_overdue = round(sum(s.amount for s in suppliers_curr if s.agingDays != "Not due"), 2)
@@ -647,13 +680,20 @@ def get_dso_dpo_dashboard(
             "customerOverdue": {"current": total_customer_overdue, "previous": 0},
             "supplierOverdue": {"current": total_supplier_overdue, "previous": 0},
         },
+        "counts": {
+            "totalClients":   total_clients,
+            "totalCustomers": total_customers,
+            "totalSuppliers": total_suppliers,
+        },
         "customerAging":        customer_aging,
         "supplierAging":        supplier_aging,
         "supplierAgingByYear":  supplier_aging_by_year,
+        "supplierAgingDetail":  supplier_aging_detail,
         "topCustomers":         top_customers,
         "topSuppliers":         top_suppliers,
-        "customerDelayDist":    customer_delay_dist,
-        "supplierDelayDist":    supplier_delay_dist,
+        "customerDelayDist":          customer_delay_dist,
+        "supplierDelayDist":          supplier_delay_dist,
+        "supplierExpenseCategories":  supplier_expense_categories,
         "years": {
             "current": year,
             "prev":    prev_year,

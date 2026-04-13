@@ -18,6 +18,13 @@ const accessService = {
     return handleResponse(response);
   },
 
+  getMyPermissions: async () => {
+    const response = await fetch(`${API_BASE_URL}/dashboard-access/my-permissions`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
   getAvailableDashboards: async () => {
     const response = await fetch(`${API_BASE_URL}/dashboard-access/dashboards`, {
       headers: getAuthHeaders(),

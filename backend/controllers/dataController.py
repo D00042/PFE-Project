@@ -8,7 +8,6 @@ from schemas.data import (
     CashFlowCreate, CashFlowUpdate, CashFlowOut,
     ClientCreate, ClientUpdate, ClientOut,
 )
-
 router = APIRouter(tags=["data"])
 
 FISCAL_PERIOD_MAP = {

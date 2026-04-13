@@ -14,6 +14,7 @@ export default function DashboardAccess() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast]     = useState(null)
   const [pending, setPending] = useState({})
+  const [confirmation, setConfirmation] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -24,6 +25,26 @@ export default function DashboardAccess() {
   }, [])
 
   const toggle = async (userId, dashboard, currentValue) => {
+    const enabled = !currentValue
+
+    // Show confirmation when ENABLING access
+    if (enabled) {
+      const user = leaders.find(u => u.id === userId)
+      const dashboardLabel = DASHBOARDS.find(d => d.key === dashboard)?.label
+      setConfirmation({
+        userId,
+        dashboard,
+        userName: user?.fullName || user?.email,
+        dashboardLabel,
+      })
+      return
+    }
+
+    // Proceed with toggle (for disabling)
+    await executeToggle(userId, dashboard, currentValue)
+  }
+
+  const executeToggle = async (userId, dashboard, currentValue) => {
     const key     = `${userId}-${dashboard}`
     const enabled = !currentValue
 
@@ -50,6 +71,17 @@ export default function DashboardAccess() {
     } finally {
       setPending(p => { const n = { ...p }; delete n[key]; return n })
     }
+  }
+
+  const handleConfirm = () => {
+    if (confirmation) {
+      executeToggle(confirmation.userId, confirmation.dashboard, false)
+      setConfirmation(null)
+    }
+  }
+
+  const handleCancel = () => {
+    setConfirmation(null)
   }
 
   const showToast = (message, type) => {
@@ -82,7 +114,7 @@ export default function DashboardAccess() {
       <div style={styles.hero}>
         <div style={styles.heroAccent} />
         <h1 style={styles.heroTitle}>Dashboard Access Control</h1>
-        <p style={styles.heroSub}>Grant or revoke dashboard access for Team Leaders.</p>
+        <p style={styles.heroSub}>Grant or revoke dashboard access for Team Leaders and Members.</p>
       </div>
 
       <div style={styles.content}>
@@ -91,55 +123,74 @@ export default function DashboardAccess() {
         ) : leaders.length === 0 ? (
           <div style={styles.emptyState}>
             <span style={styles.emptyIcon}>👥</span>
-            <p style={styles.emptyText}>No Team Leader accounts found.</p>
-            <p style={styles.emptySub}>Create a Team Leader account first to assign permissions.</p>
+            <p style={styles.emptyText}>No user accounts found.</p>
+            <p style={styles.emptySub}>Create Leader or Member accounts first to assign permissions.</p>
           </div>
         ) : (
-          <div style={styles.tableCard}>
-            <div style={styles.tableHeader}>
-              <div style={{ ...styles.col, flex: 2 }}>Team Leader</div>
-              {DASHBOARDS.map(d => (
-                <div key={d.key} style={styles.col}>{d.label}</div>
-              ))}
-            </div>
-
-            {leaders.map((leader, i) => (
-              <div key={leader.id} style={{ ...styles.tableRow, background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                <div style={{ ...styles.col, flex: 2 }}>
-                  <div style={styles.leaderName}>{leader.fullName || leader.email}</div>
-                  <div style={styles.leaderEmail}>{leader.email}</div>
-                  {leader.team && <div style={styles.leaderTeam}>{leader.team}</div>}
-                </div>
-
-                {DASHBOARDS.map(d => {
-                  const isOn = leader.permissions[d.key]
-                  const key  = `${leader.id}-${d.key}`
-                  const busy = !!pending[key]
-                  return (
-                    <div key={d.key} style={styles.col}>
-                      <button
-                        onClick={() => !busy && toggle(leader.id, d.key, isOn)}
-                        style={{
-                          ...styles.toggle,
-                          background: isOn ? "#E8002D" : "#e5e7eb",
-                          opacity: busy ? 0.6 : 1,
-                          cursor: busy ? "wait" : "pointer",
-                        }}
-                      >
-                        <span style={{
-                          ...styles.toggleThumb,
-                          transform: isOn ? "translateX(20px)" : "translateX(2px)",
-                        }} />
-                      </button>
-                      <div style={{ ...styles.toggleLabel, color: isOn ? "#E8002D" : "#9ca3af" }}>
-                        {isOn ? "Enabled" : "Disabled"}
-                      </div>
+          <>
+            {[
+              { roleKey: "leader", roleLabel: "Team Leaders" },
+              { roleKey: "member", roleLabel: "Team Members" },
+            ].map(({ roleKey, roleLabel }) => {
+              const group = leaders.filter(u => u.role === roleKey)
+              if (group.length === 0) return null
+              return (
+                <div key={roleKey} style={styles.groupSection}>
+                  <div style={styles.groupHeading}>
+                    <span style={{ ...styles.roleBadge, background: roleKey === "leader" ? "#1a2b4a" : "#6b7280" }}>
+                      {roleLabel}
+                    </span>
+                    <span style={styles.groupCount}>{group.length} user{group.length > 1 ? "s" : ""}</span>
+                  </div>
+                  <div style={styles.tableCard}>
+                    <div style={styles.tableHeader}>
+                      <div style={{ ...styles.col, flex: 2 }}>User</div>
+                      {DASHBOARDS.map(d => (
+                        <div key={d.key} style={styles.col}>{d.label}</div>
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
+
+                    {group.map((user, i) => (
+                      <div key={user.id} style={{ ...styles.tableRow, background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                        <div style={{ ...styles.col, flex: 2 }}>
+                          <div style={styles.leaderName}>{user.fullName || user.email}</div>
+                          <div style={styles.leaderEmail}>{user.email}</div>
+                          {user.team && <div style={styles.leaderTeam}>{user.team}</div>}
+                        </div>
+
+                        {DASHBOARDS.map(d => {
+                          const isOn = user.permissions[d.key]
+                          const key  = `${user.id}-${d.key}`
+                          const busy = !!pending[key]
+                          return (
+                            <div key={d.key} style={styles.col}>
+                              <button
+                                onClick={() => !busy && toggle(user.id, d.key, isOn)}
+                                style={{
+                                  ...styles.toggle,
+                                  background: isOn ? "#E8002D" : "#e5e7eb",
+                                  opacity: busy ? 0.6 : 1,
+                                  cursor: busy ? "wait" : "pointer",
+                                }}
+                              >
+                                <span style={{
+                                  ...styles.toggleThumb,
+                                  transform: isOn ? "translateX(20px)" : "translateX(2px)",
+                                }} />
+                              </button>
+                              <div style={{ ...styles.toggleLabel, color: isOn ? "#E8002D" : "#9ca3af" }}>
+                                {isOn ? "Enabled" : "Disabled"}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </>
         )}
       </div>
 
@@ -149,6 +200,38 @@ export default function DashboardAccess() {
           background: toast.type === "success" ? "#1a2b4a" : "#E8002D",
         }}>
           {toast.message}
+        </div>
+      )}
+
+      {confirmation && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Confirm Access Grant</h2>
+            </div>
+            <div style={styles.modalBody}>
+              <p style={styles.modalText}>
+                Grant access to <strong>{confirmation.dashboardLabel}</strong> for <strong>{confirmation.userName}</strong>?
+              </p>
+              <p style={styles.modalSubText}>
+                An email notification will be sent to the user immediately.
+              </p>
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                onClick={handleCancel}
+                style={styles.cancelBtn}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                style={styles.confirmBtn}
+              >
+                Grant Access
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -190,6 +273,10 @@ const styles = {
   emptyIcon: { fontSize: "48px", display: "block", marginBottom: "16px" },
   emptyText: { fontSize: "18px", fontWeight: "600", color: "#1a2b4a", margin: "0 0 8px" },
   emptySub: { fontSize: "14px", color: "#9ca3af", margin: 0 },
+  groupSection: { marginBottom: "28px" },
+  groupHeading: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
+  roleBadge: { color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 12px", borderRadius: "20px" },
+  groupCount: { fontSize: "12px", color: "#9ca3af", fontWeight: "600" },
   tableCard: { background: "#fff", borderRadius: "12px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", overflow: "hidden" },
   tableHeader: {
     display: "flex", alignItems: "center",
@@ -219,5 +306,43 @@ const styles = {
     color: "#fff", padding: "14px 24px", borderRadius: "8px",
     fontWeight: "600", fontSize: "14px",
     boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+  },
+  modalOverlay: {
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    background: "rgba(0,0,0,0.4)", display: "flex",
+    alignItems: "center", justifyContent: "center", zIndex: 1000,
+  },
+  modal: {
+    background: "#fff", borderRadius: "12px", boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+    width: "90%", maxWidth: "420px", overflow: "hidden",
+  },
+  modalHeader: {
+    padding: "24px 24px 16px", borderBottom: "1px solid #e5e7eb",
+  },
+  modalTitle: {
+    margin: 0, fontSize: "18px", fontWeight: "700", color: "#1a2b4a",
+  },
+  modalBody: {
+    padding: "24px",
+  },
+  modalText: {
+    margin: "0 0 12px", fontSize: "16px", color: "#374151", lineHeight: 1.5,
+  },
+  modalSubText: {
+    margin: 0, fontSize: "13px", color: "#9ca3af", lineHeight: 1.5,
+  },
+  modalFooter: {
+    display: "flex", gap: "12px", padding: "16px 24px",
+    borderTop: "1px solid #e5e7eb", justifyContent: "flex-end",
+  },
+  cancelBtn: {
+    padding: "10px 20px", border: "1px solid #d1d5db", background: "#fff",
+    borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px",
+    color: "#374151", transition: "all 0.2s",
+  },
+  confirmBtn: {
+    padding: "10px 20px", background: "#E8002D", color: "#fff",
+    border: "none", borderRadius: "6px", cursor: "pointer",
+    fontWeight: "600", fontSize: "14px", transition: "all 0.2s",
   },
 }

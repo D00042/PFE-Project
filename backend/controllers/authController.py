@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user import User
+from models.account import Account
 from schemas.auth import UserLogin, PasswordResetRequest
 from schemas.auth import ChangePassword
 from core.security import (
@@ -10,7 +11,6 @@ from core.security import (
     create_access_token,
     create_password_reset_token,
     verify_password_reset_token
-    
 )
 from core.dependencies import get_current_user, require_roles
 from core.email import send_password_changed_email
@@ -56,21 +56,20 @@ def _send_credentials_email(email: str, full_name: str, password: str):
 # ================= LOGIN =================
 @router.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+    account = db.query(Account).filter(Account.email == user.email).first()
 
-    if not db_user:
+    if not account:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not verify_password(user.password, db_user.hashed_password):
+    if not verify_password(user.password, account.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # ← was checking user.is_active (the request body) instead of db_user.is_active
-    if not db_user.is_active:
+    if not account.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
 
     access_token = create_access_token({
-        "sub": db_user.email,
-        "role": db_user.role.value
+        "sub": account.email,
+        "role": account.user.role.value
     })
 
     return {
@@ -83,9 +82,9 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
-        "email": current_user.email,
+        "email": current_user.account.email,
         "role": current_user.role.value,
-        "is_active": current_user.is_active
+        "is_active": current_user.account.is_active
     }
 
 
@@ -97,26 +96,27 @@ def update_profile(
     current_user: User = Depends(get_current_user)
 ):
     if "email" in updates and updates["email"]:
-        # Check if email is already taken by another user
-        existing = db.query(User).filter(
-            User.email == updates["email"],
-            User.id != current_user.id
+        existing = db.query(Account).filter(
+            Account.email == updates["email"],
+            Account.user_id != current_user.id
         ).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email already in use by another account")
-        current_user.email = updates["email"]
- 
+        current_user.account.email = updates["email"]
+
     if "fullName" in updates:
         current_user.fullName = updates["fullName"]
- 
+
     if "telephone" in updates:
         current_user.telephone = updates["telephone"]
- 
+
     db.commit()
     db.refresh(current_user)
- 
+
     return {"message": "Profile updated successfully"}
  
+
+
 
 
 
@@ -147,12 +147,12 @@ def manager_panel(current_user: User = Depends(require_roles(["manager"]))):
 # ================= REQUEST PASSWORD RESET =================
 @router.post("/request-password-reset")
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    account = db.query(Account).filter(Account.email == data.email).first()
 
-    if not user:
+    if not account:
         raise HTTPException(status_code=404, detail="User not found")
 
-    reset_token = create_password_reset_token(user.email)
+    reset_token = create_password_reset_token(account.email)
 
     return {
         "message": "Password reset token generated",
@@ -167,9 +167,9 @@ def reset_password(token: str, new_password: str, db: Session = Depends(get_db))
     payload = verify_password_reset_token(token)
     email = payload.get("sub")
 
-    user = db.query(User).filter(User.email == email).first()
+    account = db.query(Account).filter(Account.email == email).first()
 
-    user.hashed_password = hash_password(new_password)
+    account.hashed_password = hash_password(new_password)
 
     db.commit()
 
@@ -182,17 +182,14 @@ def change_password(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not verify_password(data.old_password, current_user.hashed_password):
+    if not verify_password(data.old_password, current_user.account.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
 
-    current_user.hashed_password = hash_password(data.new_password)
+    current_user.account.hashed_password = hash_password(data.new_password)
     db.commit()
 
-    # DEBUG — remove after fixing
-    print(f"[debug] Sending email to: {current_user.email}, name: {current_user.fullName}")
-    
     try:
-        send_password_changed_email(current_user.email, current_user.fullName or "")
+        send_password_changed_email(current_user.account.email, current_user.fullName or "")
         print("[debug] Email sent successfully")
     except Exception as e:
         print(f"[debug] Email failed: {e}")   # ← this will show the real error

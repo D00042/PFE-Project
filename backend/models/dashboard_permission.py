@@ -29,3 +29,8 @@ class DashboardPermission(Base):
         "User",
         foreign_keys="DashboardPermission.granted_by"
     )
+
+    dashboard_accesses = relationship(
+        "DashboardAccess",
+        back_populates="dashboard_permission"
+    )
