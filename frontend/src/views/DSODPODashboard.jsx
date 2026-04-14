@@ -96,6 +96,15 @@ const GaugeChart = ({ value, max, color, label }) => {
   );
 };
 
+if (!document.getElementById("dso-print-style")) {
+  const s = document.createElement("style");
+  s.id = "dso-print-style";
+  s.textContent = `@media print { body *{visibility:hidden} #dso-print,#dso-print *{visibility:visible} #dso-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  document.head.appendChild(s);
+}
+
+const exportPDF = () => window.print();
+
 export default function DSODPODashboard() {
   const navigate    = useNavigate();
   const currentYear = new Date().getFullYear();
@@ -202,17 +211,20 @@ export default function DSODPODashboard() {
     .map((d, i) => ({ name: d.bucket, value: d.amount, fill: AGING_COLORS[i % AGING_COLORS.length] }));
 
   return (
-    <div style={S.page}>
+    <div style={S.page} id="dso-print">
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>DSO & DPO</h1>
-        <img src="/Tui_logo.png" alt="TUI" style={S.logo} onError={e => e.target.style.display = "none"} />
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <button style={S.exportBtn} onClick={exportPDF}>↓ PDF</button>
+          <img src="/Tui_logo.png" alt="TUI" style={S.logo} onError={e => e.target.style.display = "none"} />
+        </div>
       </div>
 
       {/* ── Controls ─────────────────────────────────────────────────────── */}
-      <div style={S.controlBar}>
+      <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
             <button key={y} style={year === y ? S.yearTabActive : S.yearTab} onClick={() => setYear(y)}>{y}</button>
@@ -629,6 +641,7 @@ const S = {
   backBtn:     { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.navy, marginRight: 16, padding: "4px 8px", borderRadius: 8 },
   pageTitle:   { flex: 1, textAlign: "center", color: C.navy, fontSize: 22, fontWeight: 800, margin: 0 },
   logo:        { height: 32 },
+  exportBtn:   { padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.navy}`, background: C.navy, color: "white", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "Arial,sans-serif" },
   controlBar:  { display: "flex", alignItems: "center", flexWrap: "wrap", padding: "10px 28px", gap: 12, background: "white", borderBottom: "1px solid #E5E7EB" },
   yearTabs:    { display: "flex", gap: 4 },
   yearTab:         { padding: "6px 18px", borderRadius: 6, border: "1px solid #CBD5E1", background: "white", cursor: "pointer", fontSize: 13, fontFamily: "Arial, sans-serif", color: "#374151" },
