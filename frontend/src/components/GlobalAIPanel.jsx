@@ -101,9 +101,7 @@ export default function GlobalAIPanel({ year, period }) {
             {/* Generate button row */}
             <div style={S.controlsRow}>
               <p style={S.description}>
-                This interpretation reads data from all four dashboards — profitability,
-                balance sheet, liquidity, and client position — and returns a unified
-                cross-dashboard analysis. Results are saved automatically to the AI Insights page.
+                This interpretation reads data from all four dashboards.
               </p>
               <button
                 style={{
