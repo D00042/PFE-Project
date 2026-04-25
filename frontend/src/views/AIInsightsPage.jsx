@@ -89,13 +89,14 @@ function ExpandedDetail({ record }) {
 
 export default function AIInsightsPage() {
   const navigate = useNavigate();
-  const [activeTab,  setActiveTab]  = useState("global");
-  const [records,    setRecords]    = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [toast,      setToast]      = useState(null);
+  const [activeTab,   setActiveTab]   = useState("global");
+  const [records,     setRecords]     = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [expandedId,  setExpandedId]  = useState(null);
+  const [toast,       setToast]       = useState(null);
+  const [dateSearch,  setDateSearch]  = useState("");
 
-  useEffect(() => { fetchRecords(); setExpandedId(null); }, [activeTab]);
+  useEffect(() => { fetchRecords(); setExpandedId(null); setDateSearch(""); }, [activeTab]);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -146,6 +147,14 @@ export default function AIInsightsPage() {
 
   const showNextPeriod = activeTab !== "global";
 
+  const filteredRecords = dateSearch
+    ? records.filter(r => {
+        const d = new Date(r.createdAt);
+        const recordDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return recordDate === dateSearch;
+      })
+    : records;
+
   return (
     <div style={S.page}>
       <div style={S.topBar}>
@@ -186,11 +195,47 @@ export default function AIInsightsPage() {
                 ? "Use the Global Interpretation button in the Profitability Dashboard top bar."
                 : `Generate insights from the ${DASHBOARD_TABS.find(t => t.key === activeTab)?.label} dashboard.`}
             </p>
-            <button style={S.goBtn} onClick={() => navigate("/home/dashboard/profitability")}>
-              Go to Profitability Dashboard
+            <button style={S.goBtn} onClick={() => {
+              const routes = {
+                global:        "/home/dashboard/profitability",
+                profitability: "/home/dashboard/profitability",
+                balance_sheet: "/home/dashboard/balance-sheet",
+                liquidity:     "/home/dashboard/liquidity",
+                dso_dpo:       "/home/dashboard/dso-dpo",
+              };
+              navigate(routes[activeTab] || "/home/dashboard/profitability");
+            }}>
+              Go to {DASHBOARD_TABS.find(t => t.key === activeTab)?.label ?? "Profitability"} Dashboard
             </button>
           </div>
         ) : (
+          <div>
+            {/* Search bar */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <span style={{ position: "absolute", left: 10, fontSize: 14, color: C.grey, pointerEvents: "none" }}>📅</span>
+                <input
+                  type="date"
+                  value={dateSearch}
+                  onChange={e => { setDateSearch(e.target.value); setExpandedId(null); }}
+                  style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 8, border: "1px solid #CBD5E1", fontSize: 13, fontFamily: "Arial, sans-serif", color: "#374151", background: "white", cursor: "pointer" }}
+                />
+              </div>
+              {dateSearch && (
+                <button
+                  onClick={() => { setDateSearch(""); setExpandedId(null); }}
+                  style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #CBD5E1", background: "white", fontSize: 12, color: C.grey, cursor: "pointer", fontFamily: "Arial, sans-serif" }}
+                >
+                  Clear
+                </button>
+              )}
+              {dateSearch && (
+                <span style={{ fontSize: 12, color: C.grey }}>
+                  {filteredRecords.length} result{filteredRecords.length !== 1 ? "s" : ""} for {new Date(dateSearch + "T00:00:00").toLocaleDateString()}
+                </span>
+              )}
+            </div>
+
           <div style={S.tableCard}>
             {/* Table header */}
             <div style={S.tableHead}>
@@ -203,7 +248,11 @@ export default function AIInsightsPage() {
             </div>
 
             {/* Rows */}
-            {records.map((record, i) => {
+            {filteredRecords.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: C.grey, fontSize: 13 }}>
+                No insights found for this date.
+              </div>
+            ) : filteredRecords.map((record, i) => {
               const badge      = getTypeBadge(record);
               const isExpanded = expandedId === record.id;
               return (
@@ -245,6 +294,7 @@ export default function AIInsightsPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         )}
       </div>

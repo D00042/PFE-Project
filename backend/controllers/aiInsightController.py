@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.ai_insight import AIInsight
-from models.data_models import RevenueExpense
+from models.data_models import RevenueExpense, AssetLiability, Client
 from core.dependencies import get_current_user, require_roles
 from models.user import User
 from pydantic import BaseModel
@@ -165,6 +165,238 @@ def get_profitability_from_db(year: int, period: str, db: Session) -> dict:
     }
 
 
+def get_liquidity_from_db(year: int, period: str, db: Session) -> dict:
+    from models.data_models import CashFlow, AssetLiability as AL
+
+    FISCAL_PERIODS_LIQ = [
+        "P1","P2","P3","P4","P5","P6","P7","P8","P9","P10","P11","P12"
+    ]
+    PERIOD_TO_MONTH_LIQ = {
+        "P1":"October","P2":"November","P3":"December","P4":"January",
+        "P5":"February","P6":"March","P7":"April","P8":"May",
+        "P9":"June","P10":"July","P11":"August","P12":"September",
+    }
+    idx            = FISCAL_PERIODS_LIQ.index(period) if period in FISCAL_PERIODS_LIQ else 11
+    active_periods = FISCAL_PERIODS_LIQ[:idx + 1]
+    prev_year      = year - 1
+
+    cf_curr = db.query(CashFlow).filter(
+        CashFlow.year == year, CashFlow.period.in_(active_periods)
+    ).all()
+    cf_prev = db.query(CashFlow).filter(
+        CashFlow.year == prev_year, CashFlow.period.in_(active_periods)
+    ).all()
+
+    def sum_label(rows, label):
+        return round(sum(r.value for r in rows if r.label == label), 2)
+
+    OPERATING_LABEL  = "Operating Cash Flow"
+    CLOSING_LABEL    = "Closing Cash Balance"
+    OPENING_LABEL    = "Opening Cash Balance"
+    INVESTING_LABELS = ["Net Investments Cash Flow"]
+    FINANCING_LABELS = [
+        "Lease & Asset Financing Repayments",
+        "Adj. Financing Cash Flow",
+        "Total change in Cash due to FX",
+    ]
+
+    op_curr    = sum_label(cf_curr, OPERATING_LABEL)
+    op_prev    = sum_label(cf_prev, OPERATING_LABEL)
+    inv_curr   = sum(sum_label(cf_curr, l) for l in INVESTING_LABELS)
+    fin_curr   = sum(sum_label(cf_curr, l) for l in FINANCING_LABELS)
+    closing_c  = sum_label(cf_curr, CLOSING_LABEL)
+    closing_p  = sum_label(cf_prev, CLOSING_LABEL)
+    opening_c  = sum_label(cf_curr, OPENING_LABEL)
+    opening_p  = sum_label(cf_prev, OPENING_LABEL)
+    free_cf    = round(op_curr + inv_curr, 2)
+
+    # Cash ratio from AssetLiability
+    from sqlalchemy import func as sqlfunc
+    CURRENT_LIAB_LABELS = [
+        "Trade payables", "Current prepayments received",
+        "Current other liabilities - non-financial instruments",
+        "Current income tax payable",
+    ]
+    cash_al = db.query(sqlfunc.sum(AL.value)).filter(
+        AL.year == year, AL.period.in_(active_periods),
+        AL.label == "SB Cash and cash equivalents"
+    ).scalar() or 0
+    curr_liab = db.query(sqlfunc.sum(AL.value)).filter(
+        AL.year == year, AL.period.in_(active_periods),
+        AL.label.in_(CURRENT_LIAB_LABELS)
+    ).scalar() or 0
+    cash_ratio = round(cash_al / curr_liab, 4) if curr_liab else 0
+
+    monthly = []
+    for p in active_periods:
+        rows = [r for r in cf_curr if r.period == p]
+        op   = sum(r.value for r in rows if r.label == OPERATING_LABEL)
+        inv  = sum(r.value for r in rows if r.label in INVESTING_LABELS)
+        fin  = sum(r.value for r in rows if r.label in FINANCING_LABELS)
+        monthly.append({
+            "period": p,
+            "month":  PERIOD_TO_MONTH_LIQ.get(p, p),
+            "operating": round(op,  2),
+            "investing": round(inv, 2),
+            "financing": round(fin, 2),
+            "net":       round(op + inv + fin, 2),
+        })
+
+    return {
+        "operating_cf": op_curr, "operating_cf_prev": op_prev,
+        "investing_cf": inv_curr, "financing_cf": fin_curr,
+        "free_cf": free_cf,
+        "closing_cash": closing_c, "closing_cash_prev": closing_p,
+        "opening_cash": opening_c, "opening_cash_prev": opening_p,
+        "cash_ratio": cash_ratio,
+        "monthly": monthly,
+        "active_periods": active_periods,
+        "prev_year": prev_year,
+    }
+
+
+def get_dso_dpo_from_db(year: int, period: str, db: Session) -> dict:
+    from sqlalchemy import func as sqlfunc
+    active_months = get_active_months(period)
+    prev_year     = year - 1
+
+    def get_clients(yr, ctype):
+        return db.query(Client).filter(
+            Client.year == yr,
+            Client.clientType.in_([ctype, ctype.capitalize()])
+        ).all()
+
+    customers_curr = get_clients(year,      "customer")
+    customers_prev = get_clients(prev_year, "customer")
+    suppliers_curr = get_clients(year,      "supplier")
+    suppliers_prev = get_clients(prev_year, "supplier")
+
+    def get_revenue(yr):
+        return db.query(sqlfunc.sum(RevenueExpense.value)).filter(
+            RevenueExpense.year == yr,
+            RevenueExpense.label == "Revenue",
+            RevenueExpense.month.in_(active_months)
+        ).scalar() or 0
+
+    def get_al(yr, label):
+        return db.query(sqlfunc.sum(AssetLiability.value)).filter(
+            AssetLiability.year == yr,
+            AssetLiability.month.in_(active_months),
+            AssetLiability.label == label
+        ).scalar() or 0
+
+    revenue      = get_revenue(year)
+    prev_revenue = get_revenue(prev_year)
+    days         = len(active_months) * 30
+
+    trade_recv = get_al(year,      "Current trade and other receivables")
+    trade_pay  = get_al(year,      "Trade payables")
+    prev_recv  = get_al(prev_year, "Current trade and other receivables")
+    prev_pay   = get_al(prev_year, "Trade payables")
+
+    dso      = round((trade_recv / revenue)      * days, 1) if revenue      else 0
+    dpo      = round((trade_pay  / revenue)      * days, 1) if revenue      else 0
+    prev_dso = round((prev_recv  / prev_revenue) * days, 1) if prev_revenue else 0
+    prev_dpo = round((prev_pay   / prev_revenue) * days, 1) if prev_revenue else 0
+
+    aging_buckets = ["Not due", "0-30 days", "31-61 days", "61-90 days", "90-180 days", ">180 days"]
+
+    cust_aging = [
+        {"bucket": b, "amount": round(sum(c.amount for c in customers_curr if c.agingDays == b), 2)}
+        for b in aging_buckets
+    ]
+    supp_aging = [
+        {"bucket": b, "amount": round(sum(s.amount for s in suppliers_curr if s.agingDays == b), 2)}
+        for b in aging_buckets
+    ]
+
+    cust_total        = round(sum(c.amount for c in customers_curr), 2)
+    cust_total_prev   = round(sum(c.amount for c in customers_prev), 2)
+    cust_overdue      = round(sum(c.amount for c in customers_curr if c.agingDays != "Not due"), 2)
+    supp_total        = round(sum(s.amount for s in suppliers_curr), 2)
+    supp_total_prev   = round(sum(s.amount for s in suppliers_prev), 2)
+    supp_overdue      = round(sum(s.amount for s in suppliers_curr if s.agingDays != "Not due"), 2)
+
+    return {
+        "dso": dso, "prev_dso": prev_dso,
+        "dpo": dpo, "prev_dpo": prev_dpo,
+        "revenue": revenue, "prev_revenue": prev_revenue,
+        "trade_recv": trade_recv, "trade_pay": trade_pay,
+        "cust_total": cust_total, "cust_total_prev": cust_total_prev,
+        "cust_overdue": cust_overdue,
+        "supp_total": supp_total, "supp_total_prev": supp_total_prev,
+        "supp_overdue": supp_overdue,
+        "cust_aging": cust_aging, "supp_aging": supp_aging,
+        "active_months": active_months,
+    }
+
+
+def get_balance_sheet_from_db(year: int, period: str, db: Session) -> dict:
+    try:
+        period_index = int(period.replace("P", "")) - 1
+    except ValueError:
+        period_index = 11
+
+    fiscal_months = [
+        "October","November","December","January","February","March",
+        "April","May","June","July","August","September"
+    ]
+    snapshot_month  = fiscal_months[period_index]
+    prev_month      = snapshot_month
+
+    def q(yr, mth):
+        return db.query(AssetLiability).filter(
+            AssetLiability.year == yr,
+            AssetLiability.month == mth
+        ).all()
+
+    current  = q(year,     snapshot_month)
+    previous = q(year - 1, prev_month)
+
+    def sl(entries, label):
+        return round(sum(e.value or 0 for e in entries
+                         if (e.label or "").strip().lower() == label.strip().lower()), 2)
+
+    def ss(entries, subcategory):
+        return round(sum(e.value or 0 for e in entries
+                         if (e.subCategory or "").strip().lower() == subcategory.strip().lower()), 2)
+
+    non_curr_c  = ss(current,  "SB Non-current Assets")
+    non_curr_p  = ss(previous, "SB Non-current Assets")
+    curr_c      = ss(current,  "SB Current Assets")
+    curr_p      = ss(previous, "SB Current Assets")
+    total_c     = non_curr_c + curr_c
+    total_p     = non_curr_p + curr_p
+    equity_c    = sl(current,  "Equity holders of parent")
+    equity_p    = sl(previous, "Equity holders of parent")
+    ncl_c       = sl(current,  "SB Non-current provisions and liabilities")
+    ncl_p       = sl(previous, "SB Non-current provisions and liabilities")
+    cl_c        = ss(current,  "SB Current Provisions And Liabilities")
+    cl_p        = ss(previous, "SB Current Provisions And Liabilities")
+    cash_c      = sl(current,  "SB Cash and cash equivalents")
+    cash_p      = sl(previous, "SB Cash and cash equivalents")
+
+    equity_ratio  = round(equity_c / total_c * 100, 2) if total_c else 0
+    working_cap   = round(curr_c - cl_c, 2)
+    current_ratio = round(curr_c / cl_c, 2) if cl_c else 0
+    debt_equity   = round((ncl_c + cl_c) / equity_c, 2) if equity_c else 0
+
+    return {
+        "snapshot_month": snapshot_month,
+        "total_assets_c": total_c, "total_assets_p": total_p,
+        "non_curr_c": non_curr_c, "non_curr_p": non_curr_p,
+        "curr_assets_c": curr_c, "curr_assets_p": curr_p,
+        "equity_c": equity_c, "equity_p": equity_p,
+        "ncl_c": ncl_c, "ncl_p": ncl_p,
+        "cl_c": cl_c, "cl_p": cl_p,
+        "cash_c": cash_c, "cash_p": cash_p,
+        "equity_ratio": equity_ratio,
+        "working_capital": working_cap,
+        "current_ratio": current_ratio,
+        "debt_to_equity": debt_equity,
+    }
+
+
 # ─────────────────────────────────────────────────────────────
 # Request schema
 # ─────────────────────────────────────────────────────────────
@@ -185,35 +417,6 @@ def generate_interpretation(
     db:   Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    data = get_profitability_from_db(body.year, body.period, db)
-
-    pl_text = ""
-    for row in data["pl"]:
-        arrow = "↑" if row["direction"] == "up" else "↓"
-        pl_text += (
-            f"  {row['label']}: {row['current']:,.0f} EUR "
-            f"({arrow} {abs(row['change']):,.0f} vs {body.year - 1})\n"
-        )
-
-    oh_text = ""
-    for oh in data["overheads"]:
-        arrow = "↑" if oh["change"] >= 0 else "↓"
-        oh_text += (
-            f"  {oh['category']}: {oh['current']:,.0f} EUR "
-            f"({arrow} {abs(oh['change']):,.0f} vs {body.year - 1})\n"
-        )
-
-    monthly_text = ""
-    for m in data["monthly"]:
-        monthly_text += (
-            f"  {m['month']}: Revenue {m['revenue']:,.0f} | "
-            f"EBIT {m['ebit']:,.0f} | Expenses {m['expenses']:,.0f}\n"
-        )
-    budget_text = f"""
-        Budget Revenue : {data['budget_revenue']:,.0f} EUR
-        Budget EBIT    : {data['budget_ebit']:,.0f} EUR
-        Revenue vs Budget gap: {data['revenue_curr'] - data['budget_revenue']:,.0f} EUR
-    """
     standards_block = f"""
 Use the following financial standards only to identify risks.
 Do not mention article numbers, law names, or the code name in your response.
@@ -222,7 +425,179 @@ Do not mention article numbers, law names, or the code name in your response.
 ---
 """ if FINANCIAL_STANDARDS else ""
 
-    prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+    if body.dashboard == "liquidity":
+        data = get_liquidity_from_db(body.year, body.period, db)
+        monthly_text = "".join(
+            f"  {m['month']}: Operating {m['operating']:,.0f} | Investing {m['investing']:,.0f} | Financing {m['financing']:,.0f} | Net {m['net']:,.0f}\n"
+            for m in data["monthly"]
+        )
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Analyze the Liquidity data for fiscal year {body.year}, period {body.period}
+(periods: {', '.join(data['active_periods'])}).
+All comparisons are against the same period of {data['prev_year']}.
+
+KEY METRICS:
+  Cash Ratio           : {data['cash_ratio']:.2f}
+  Free Cash Flow       : {data['free_cf']:,.0f} EUR
+  Opening Cash Balance : {data['opening_cash']:,.0f} EUR (prev: {data['opening_cash_prev']:,.0f})
+  Closing Cash Balance : {data['closing_cash']:,.0f} EUR (prev: {data['closing_cash_prev']:,.0f})
+  Operating Cash Flow  : {data['operating_cf']:,.0f} EUR (prev: {data['operating_cf_prev']:,.0f})
+  Investing Cash Flow  : {data['investing_cf']:,.0f} EUR
+  Financing Cash Flow  : {data['financing_cf']:,.0f} EUR
+
+MONTHLY BREAKDOWN:
+{monthly_text}
+
+Return ONLY a valid JSON object. No markdown, no backticks, nothing outside the JSON.
+{{
+  "bullets": [
+    "First observation referencing a specific number.",
+    "Second observation.",
+    "Third observation.",
+    "Fourth observation.",
+    "Fifth observation."
+  ],
+  "legal_flags": [
+    "A financial risk concern in plain language if one exists."
+  ]
+}}
+
+Rules:
+- bullets: 4 to 6 sentences. Each must reference specific numbers from the data.
+- legal_flags: plain language only, no article numbers or law names. Empty array if no concerns.
+- Do not repeat the same point in both arrays.
+"""
+
+    elif body.dashboard == "dso_dpo":
+        data = get_dso_dpo_from_db(body.year, body.period, db)
+        cust_aging_text = "".join(
+            f"  {r['bucket']}: {r['amount']:,.0f} EUR\n" for r in data["cust_aging"]
+        )
+        supp_aging_text = "".join(
+            f"  {r['bucket']}: {r['amount']:,.0f} EUR\n" for r in data["supp_aging"]
+        )
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Analyze the DSO & DPO data for fiscal year {body.year}, period {body.period}
+(months: {', '.join(data['active_months'])}).
+All comparisons are against the same period of {body.year - 1}.
+
+KEY METRICS:
+  DSO (Days Sales Outstanding)     : {data['dso']:.1f} days (prev: {data['prev_dso']:.1f})
+  DPO (Days Payable Outstanding)   : {data['dpo']:.1f} days (prev: {data['prev_dpo']:.1f})
+  Revenue                          : {data['revenue']:,.0f} EUR (prev: {data['prev_revenue']:,.0f})
+  Trade Receivables                : {data['trade_recv']:,.0f} EUR
+  Trade Payables                   : {data['trade_pay']:,.0f} EUR
+
+CUSTOMER POSITION:
+  Total Receivables : {data['cust_total']:,.0f} EUR (prev: {data['cust_total_prev']:,.0f})
+  Overdue Amount    : {data['cust_overdue']:,.0f} EUR
+
+CUSTOMER AGING:
+{cust_aging_text}
+SUPPLIER POSITION:
+  Total Payables    : {data['supp_total']:,.0f} EUR (prev: {data['supp_total_prev']:,.0f})
+  Overdue Amount    : {data['supp_overdue']:,.0f} EUR
+
+SUPPLIER AGING:
+{supp_aging_text}
+
+Return ONLY a valid JSON object. No markdown, no backticks, nothing outside the JSON.
+{{
+  "bullets": [
+    "First observation referencing a specific number.",
+    "Second observation.",
+    "Third observation.",
+    "Fourth observation.",
+    "Fifth observation."
+  ],
+  "legal_flags": [
+    "A financial risk concern in plain language if one exists."
+  ]
+}}
+
+Rules:
+- bullets: 4 to 6 sentences. Each must reference specific numbers from the data.
+- legal_flags: plain language only, no article numbers or law names. Empty array if no concerns.
+- Do not repeat the same point in both arrays.
+"""
+
+    elif body.dashboard == "balance_sheet":
+        data = get_balance_sheet_from_db(body.year, body.period, db)
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Analyze the Balance Sheet data for fiscal year {body.year}, period {body.period}
+(snapshot month: {data['snapshot_month']}).
+All comparisons are against the same period of {body.year - 1}.
+
+KEY METRICS:
+  Equity Ratio        : {data['equity_ratio']:.1f}%
+  Working Capital     : {data['working_capital']:,.0f} EUR
+  Current Ratio       : {data['current_ratio']:.2f}
+  Debt-to-Equity      : {data['debt_to_equity']:.2f}
+  Cash & Equivalents  : {data['cash_c']:,.0f} EUR (prev: {data['cash_p']:,.0f})
+
+BALANCE SHEET STRUCTURE:
+  Total Assets            : {data['total_assets_c']:,.0f} EUR (prev: {data['total_assets_p']:,.0f})
+  Non-current Assets      : {data['non_curr_c']:,.0f} EUR (prev: {data['non_curr_p']:,.0f})
+  Current Assets          : {data['curr_assets_c']:,.0f} EUR (prev: {data['curr_assets_p']:,.0f})
+  Equity                  : {data['equity_c']:,.0f} EUR (prev: {data['equity_p']:,.0f})
+  Non-current Liabilities : {data['ncl_c']:,.0f} EUR (prev: {data['ncl_p']:,.0f})
+  Current Liabilities     : {data['cl_c']:,.0f} EUR (prev: {data['cl_p']:,.0f})
+
+Return ONLY a valid JSON object. No markdown, no backticks, nothing outside the JSON.
+{{
+  "bullets": [
+    "First observation referencing a specific number.",
+    "Second observation.",
+    "Third observation.",
+    "Fourth observation.",
+    "Fifth observation."
+  ],
+  "legal_flags": [
+    "A financial risk concern in plain language if one exists."
+  ]
+}}
+
+Rules:
+- bullets: 4 to 6 sentences. Each must reference specific numbers from the data.
+- legal_flags: plain language only, no article numbers or law names. Empty array if no concerns.
+- Do not repeat the same point in both arrays.
+"""
+
+    else:
+        data = get_profitability_from_db(body.year, body.period, db)
+
+        pl_text = ""
+        for row in data["pl"]:
+            arrow = "↑" if row["direction"] == "up" else "↓"
+            pl_text += (
+                f"  {row['label']}: {row['current']:,.0f} EUR "
+                f"({arrow} {abs(row['change']):,.0f} vs {body.year - 1})\n"
+            )
+
+        oh_text = ""
+        for oh in data["overheads"]:
+            arrow = "↑" if oh["change"] >= 0 else "↓"
+            oh_text += (
+                f"  {oh['category']}: {oh['current']:,.0f} EUR "
+                f"({arrow} {abs(oh['change']):,.0f} vs {body.year - 1})\n"
+            )
+
+        monthly_text = ""
+        for m in data["monthly"]:
+            monthly_text += (
+                f"  {m['month']}: Revenue {m['revenue']:,.0f} | "
+                f"EBIT {m['ebit']:,.0f} | Expenses {m['expenses']:,.0f}\n"
+            )
+        budget_text = f"""
+        Budget Revenue : {data['budget_revenue']:,.0f} EUR
+        Budget EBIT    : {data['budget_ebit']:,.0f} EUR
+        Revenue vs Budget gap: {data['revenue_curr'] - data['budget_revenue']:,.0f} EUR
+    """
+
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
 {standards_block}
 Analyze the profitability data for fiscal year {body.year},
 period {body.period} (months: {', '.join(data['active_months'])}).
@@ -321,16 +696,7 @@ def generate_recommendation(
     db:   Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    data          = get_profitability_from_db(body.year, body.period, db)
     target_period = next_period(body.period)
-
-    pl_text = ""
-    for row in data["pl"]:
-        arrow = "↑" if row["direction"] == "up" else "↓"
-        pl_text += (
-            f"  {row['label']}: {row['current']:,.0f} EUR "
-            f"({arrow} {abs(row['change']):,.0f} vs {body.year - 1})\n"
-        )
 
     standards_block = f"""
 Use the following financial standards only to identify risks.
@@ -340,20 +706,7 @@ Do not mention article numbers, law names, or the code name in your response.
 ---
 """ if FINANCIAL_STANDARDS else ""
 
-    prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
-{standards_block}
-Generate 3 concise financial recommendations for period {target_period}
-based on the profitability data for fiscal year {body.year}, period {body.period}.
-
-KEY METRICS:
-  Gross Profit Margin : {data['gross_margin']:.1f}%
-  EBIT Margin         : {data['ebit_margin']:.1f}%
-  Net Profit Margin   : {data['net_margin']:.1f}%
-  Total Revenue       : {data['revenue_curr']:,.0f} EUR (prev: {data['revenue_prev']:,.0f})
-
-PROFIT AND LOSS BREAKDOWN:
-{pl_text}
-
+    rec_json_schema = f"""
 Return ONLY a valid JSON object. No markdown, no backticks, nothing outside the JSON.
 {{
   "recommendations": [
@@ -371,6 +724,77 @@ Rules:
 - Use specific numbers from the data.
 - No article numbers, no law names, no markdown inside strings.
 """
+
+    if body.dashboard == "liquidity":
+        data = get_liquidity_from_db(body.year, body.period, db)
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Generate 3 concise recommendations for period {target_period}
+based on Liquidity data for fiscal year {body.year}, period {body.period}.
+
+KEY METRICS:
+  Cash Ratio           : {data['cash_ratio']:.2f}
+  Free Cash Flow       : {data['free_cf']:,.0f} EUR
+  Operating Cash Flow  : {data['operating_cf']:,.0f} EUR (prev: {data['operating_cf_prev']:,.0f})
+  Closing Cash Balance : {data['closing_cash']:,.0f} EUR (prev: {data['closing_cash_prev']:,.0f})
+  Investing Cash Flow  : {data['investing_cf']:,.0f} EUR
+  Financing Cash Flow  : {data['financing_cf']:,.0f} EUR
+{rec_json_schema}"""
+
+    elif body.dashboard == "dso_dpo":
+        data = get_dso_dpo_from_db(body.year, body.period, db)
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Generate 3 concise recommendations for period {target_period}
+based on DSO & DPO data for fiscal year {body.year}, period {body.period}.
+
+KEY METRICS:
+  DSO : {data['dso']:.1f} days (prev: {data['prev_dso']:.1f})
+  DPO : {data['dpo']:.1f} days (prev: {data['prev_dpo']:.1f})
+  Customer Receivables : {data['cust_total']:,.0f} EUR (overdue: {data['cust_overdue']:,.0f})
+  Supplier Payables    : {data['supp_total']:,.0f} EUR (overdue: {data['supp_overdue']:,.0f})
+{rec_json_schema}"""
+
+    elif body.dashboard == "balance_sheet":
+        data = get_balance_sheet_from_db(body.year, body.period, db)
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Generate 3 concise recommendations for period {target_period}
+based on Balance Sheet data for fiscal year {body.year}, period {body.period}.
+
+KEY METRICS:
+  Equity Ratio    : {data['equity_ratio']:.1f}%
+  Working Capital : {data['working_capital']:,.0f} EUR
+  Current Ratio   : {data['current_ratio']:.2f}
+  Debt-to-Equity  : {data['debt_to_equity']:.2f}
+  Total Assets    : {data['total_assets_c']:,.0f} EUR (prev: {data['total_assets_p']:,.0f})
+  Equity          : {data['equity_c']:,.0f} EUR (prev: {data['equity_p']:,.0f})
+  Current Liab.   : {data['cl_c']:,.0f} EUR (prev: {data['cl_p']:,.0f})
+{rec_json_schema}"""
+
+    else:
+        data = get_profitability_from_db(body.year, body.period, db)
+        pl_text = ""
+        for row in data["pl"]:
+            arrow = "↑" if row["direction"] == "up" else "↓"
+            pl_text += (
+                f"  {row['label']}: {row['current']:,.0f} EUR "
+                f"({arrow} {abs(row['change']):,.0f} vs {body.year - 1})\n"
+            )
+        prompt = f"""You are a senior financial analyst at TUI TGBST Tunisia.
+{standards_block}
+Generate 3 concise financial recommendations for period {target_period}
+based on the profitability data for fiscal year {body.year}, period {body.period}.
+
+KEY METRICS:
+  Gross Profit Margin : {data['gross_margin']:.1f}%
+  EBIT Margin         : {data['ebit_margin']:.1f}%
+  Net Profit Margin   : {data['net_margin']:.1f}%
+  Total Revenue       : {data['revenue_curr']:,.0f} EUR (prev: {data['revenue_prev']:,.0f})
+
+PROFIT AND LOSS BREAKDOWN:
+{pl_text}
+{rec_json_schema}"""
 
     try:
         co       = cohere.ClientV2(COHERE_API_KEY)

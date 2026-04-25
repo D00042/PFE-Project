@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import dashboardService from "../services/dashboardService.js";
+import LiquidityAIPanel from "../components/LiquidityAIPanel.jsx";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -76,9 +77,6 @@ export default function LiquidityDashboard() {
   const [data,        setData]        = useState(null);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState("");
-  const [interpretation, setInterpretation] = useState("");
-  const [loadingAI, setLoadingAI]           = useState(false);
-  const [aiError, setAiError]               = useState("");
 
   useEffect(() => { setCompareYear(year - 1); }, [year]);
   useEffect(() => { fetchData(); }, [year, compareYear, period]);
@@ -100,32 +98,6 @@ export default function LiquidityDashboard() {
     }
   };
 
-  const fetchInterpretation = async () => {
-    if (!data) return;
-    setLoadingAI(true);
-    setAiError("");
-    setInterpretation("");
-    try {
-        const { data: result } = await dashboardService.interpretLiquidity({
-            year,
-            period,
-            cashRatioCurrent:    data.kpis.cashRatio?.current    ?? 0,
-            cashRatioPrev:       data.kpis.cashRatio?.previous   ?? 0,
-            freeCashFlowCurrent: data.kpis.freeCashFlow?.current ?? 0,
-            freeCashFlowPrev:    data.kpis.freeCashFlow?.previous ?? 0,
-            closingCashCurrent:  data.kpis.closingCash?.current  ?? 0,
-            closingCashPrev:     data.kpis.closingCash?.previous ?? 0,
-            openingCashCurrent:  data.kpis.openingCash?.current  ?? 0,
-            openingCashPrev:     data.kpis.openingCash?.previous ?? 0,
-        });
-        setInterpretation(result.interpretation);
-    } catch (err) {
-        const detail = err?.response?.data?.detail;
-        setAiError(detail ? `Error: ${detail}` : "Failed to generate interpretation. Please try again.");
-    } finally {
-        setLoadingAI(false);
-    }
-};
 
   if (loading) return (
     <div style={S.page}>
@@ -265,33 +237,8 @@ export default function LiquidityDashboard() {
   })}
 </div>
 
-      {/* ── AI Interpretation Panel ── */}
-<div style={S.aiPanel}>
-    <div style={S.aiPanelHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/statistical-analysis.png" alt="AI" style={{ width: 24, height: 24 }} />
-            <p style={S.aiPanelTitle}>AI Interpretation</p>
-        </div>
-        <button
-            style={{ ...S.aiBtn, opacity: loadingAI ? 0.6 : 1, cursor: loadingAI ? "wait" : "pointer" }}
-            onClick={fetchInterpretation}
-            disabled={loadingAI || !data}
-        >
-            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
-        </button>
-    </div>
-    {aiError && <p style={S.aiError}>{aiError}</p>}
-    {!interpretation && !loadingAI && !aiError && (
-        <p style={S.aiPlaceholder}>Click "Generate Interpretation" to get an AI-powered analysis of the current dashboard metrics.</p>
-    )}
-    {loadingAI && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
-            <div style={S.aiSpinner} />
-            <p style={{ color: C.grey, fontSize: 13 }}>Analyzing your financial data...</p>
-        </div>
-    )}
-    {interpretation && <p style={S.aiText}>{interpretation}</p>}
-</div>
+      {/* ── AI Panel ── */}
+      <LiquidityAIPanel year={year} period={period} />
 
       {/* ── Waterfall ────────────────────────────────────────────────────── */}
       <div style={{ padding: "24px 28px 8px" }}>

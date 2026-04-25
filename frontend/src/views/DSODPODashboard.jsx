@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import dashboardService from "../services/dashboardService.js";
+import DSODPOAIPanel from "../components/DSODPOAIPanel.jsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie, Legend,
@@ -116,9 +117,6 @@ export default function DSODPODashboard() {
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
-  const [interpretation, setInterpretation] = useState("");
-  const [loadingAI, setLoadingAI]           = useState(false);
-  const [aiError, setAiError]               = useState("");
 
   useEffect(() => { fetchData(); }, [year, period]);
 
@@ -139,30 +137,6 @@ export default function DSODPODashboard() {
     }
   };
 
-  const fetchInterpretation = async () => {
-    if (!data) return;
-    setLoadingAI(true);
-    setAiError("");
-    setInterpretation("");
-    try {
-        const { data: result } = await dashboardService.interpretDsoDpo({
-            year,
-            period,
-            dsoCurrent:     data.kpis.dso?.current  ?? 0,
-            dsoPrev:        data.kpis.dso?.previous ?? 0,
-            dpoCurrent:     data.kpis.dpo?.current  ?? 0,
-            dpoPrev:        data.kpis.dpo?.previous ?? 0,
-            totalCustomers: data.counts?.totalCustomers ?? 0,
-            totalSuppliers: data.counts?.totalSuppliers ?? 0,
-        });
-        setInterpretation(result.interpretation);
-    } catch (err) {
-        const detail = err?.response?.data?.detail;
-        setAiError(detail ? `Error: ${detail}` : "Failed to generate interpretation. Please try again.");
-    } finally {
-        setLoadingAI(false);
-    }
-};
 
   if (loading) return (
     <div style={S.page}>
@@ -280,33 +254,8 @@ export default function DSODPODashboard() {
         </div>
       </div>
 
-      {/* ── AI Interpretation Panel ── */}
-<div style={S.aiPanel}>
-    <div style={S.aiPanelHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/statistical-analysis.png" alt="AI" style={{ width: 24, height: 24 }} />
-            <p style={S.aiPanelTitle}>AI Interpretation</p>
-        </div>
-        <button
-            style={{ ...S.aiBtn, opacity: loadingAI ? 0.6 : 1, cursor: loadingAI ? "wait" : "pointer" }}
-            onClick={fetchInterpretation}
-            disabled={loadingAI || !data}
-        >
-            {loadingAI ? "Analyzing..." : "Generate Interpretation"}
-        </button>
-    </div>
-    {aiError && <p style={S.aiError}>{aiError}</p>}
-    {!interpretation && !loadingAI && !aiError && (
-        <p style={S.aiPlaceholder}>Click "Generate Interpretation" to get an AI-powered analysis of the current dashboard metrics.</p>
-    )}
-    {loadingAI && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
-            <div style={S.aiSpinner} />
-            <p style={{ color: C.grey, fontSize: 13 }}>Analyzing your financial data...</p>
-        </div>
-    )}
-    {interpretation && <p style={S.aiText}>{interpretation}</p>}
-</div>
+      {/* ── AI Panel ── */}
+      <DSODPOAIPanel year={year} period={period} />
 
       {/* ── DSO / DPO Section ────────────────────────────────────────────── */}
       <div style={S.dsoSection}>

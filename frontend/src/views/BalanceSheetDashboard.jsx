@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import BalanceSheetAIPanel from "../components/BalanceSheetAIPanel.jsx";
 import {
   BarChart, Bar, XAxis, YAxis,
   Tooltip, ResponsiveContainer, LabelList,
@@ -413,6 +414,9 @@ export default function BalanceSheetDashboard() {
           <div style={{ ...S.kpiDelta, color: cashUp ? COLORS.green : COLORS.red }}>{cashUp ? "▲" : "▼"} {fmtK(Math.abs(cash.current - cash.previous))} vs previous year</div>
         </div>
       </div>
+
+      {/* ── AI Panel ── */}
+      <BalanceSheetAIPanel year={year} period={period} />
 
       {/* ── Row 1: Key Totals (left half) + Two Pie Charts stacked (right half) ── */}
       <div style={S.section}><p style={S.sectionHeading}>Balance Sheet Overview</p></div>
