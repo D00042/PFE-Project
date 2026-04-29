@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.ai_insight import AIInsight
-from models.data_models import RevenueExpense, AssetLiability, Client
+from models.data_models import RevenueExpense, AssetLiability, CashFlow, Client
 from core.dependencies import get_current_user, require_roles
 from models.user import User
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ import cohere
 import os
 import json
 from dotenv import load_dotenv
+from sqlalchemy import func as sqlfunc
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/ai-insights", tags=["ai-insights"])
 
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
+# loaded once at startup, injected into every prompt to help identify financial risks
 FINANCIAL_STANDARDS = ""
 try:
     standards_path = os.path.join(
@@ -30,9 +32,6 @@ except FileNotFoundError:
     print("[AI WARNING] financial_standards.txt not found.")
 
 
-# ─────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────
 
 FISCAL_PERIODS = [
     "P1","P2","P3","P4","P5","P6",
@@ -44,6 +43,7 @@ FISCAL_MONTHS_ORDER = [
     "April","May","June","July","August","September"
 ]
 
+# returns the next fiscal period, wraps from P12 back to P1
 def next_period(period: str) -> str:
     try:
         idx = FISCAL_PERIODS.index(period)
@@ -51,6 +51,7 @@ def next_period(period: str) -> str:
     except ValueError:
         return "P1"
 
+# returns the list of months active up to and including the selected period
 def get_active_months(period: str) -> list:
     try:
         idx = FISCAL_PERIODS.index(period)
@@ -58,6 +59,7 @@ def get_active_months(period: str) -> list:
         idx = 11
     return FISCAL_MONTHS_ORDER[:idx + 1]
 
+# queries revenue_expenses for the selected year and period for profitability data
 def get_profitability_from_db(year: int, period: str, db: Session) -> dict:
     active_months = get_active_months(period)
 
@@ -164,10 +166,8 @@ def get_profitability_from_db(year: int, period: str, db: Session) -> dict:
         "budget_ebit":    budget_ebit,
     }
 
-
+# queries cash_flows and asset_liabilities for liquidity data
 def get_liquidity_from_db(year: int, period: str, db: Session) -> dict:
-    from models.data_models import CashFlow, AssetLiability as AL
-
     FISCAL_PERIODS_LIQ = [
         "P1","P2","P3","P4","P5","P6","P7","P8","P9","P10","P11","P12"
     ]
@@ -210,20 +210,19 @@ def get_liquidity_from_db(year: int, period: str, db: Session) -> dict:
     opening_p  = sum_label(cf_prev, OPENING_LABEL)
     free_cf    = round(op_curr + inv_curr, 2)
 
-    # Cash ratio from AssetLiability
-    from sqlalchemy import func as sqlfunc
+   
     CURRENT_LIAB_LABELS = [
         "Trade payables", "Current prepayments received",
         "Current other liabilities - non-financial instruments",
         "Current income tax payable",
     ]
-    cash_al = db.query(sqlfunc.sum(AL.value)).filter(
-        AL.year == year, AL.period.in_(active_periods),
-        AL.label == "SB Cash and cash equivalents"
+    cash_al = db.query(sqlfunc.sum(AssetLiability.value)).filter(
+        AssetLiability.year == year, AssetLiability.period.in_(active_periods),
+        AssetLiability.label == "SB Cash and cash equivalents"
     ).scalar() or 0
-    curr_liab = db.query(sqlfunc.sum(AL.value)).filter(
-        AL.year == year, AL.period.in_(active_periods),
-        AL.label.in_(CURRENT_LIAB_LABELS)
+    curr_liab = db.query(sqlfunc.sum(AssetLiability.value)).filter(
+        AssetLiability.year == year, AssetLiability.period.in_(active_periods),
+        AssetLiability.label.in_(CURRENT_LIAB_LABELS)
     ).scalar() or 0
     cash_ratio = round(cash_al / curr_liab, 4) if curr_liab else 0
 
@@ -254,9 +253,8 @@ def get_liquidity_from_db(year: int, period: str, db: Session) -> dict:
         "prev_year": prev_year,
     }
 
-
+# queries clients and asset_liabilities for dso/dpo data
 def get_dso_dpo_from_db(year: int, period: str, db: Session) -> dict:
-    from sqlalchemy import func as sqlfunc
     active_months = get_active_months(period)
     prev_year     = year - 1
 
@@ -330,7 +328,7 @@ def get_dso_dpo_from_db(year: int, period: str, db: Session) -> dict:
         "active_months": active_months,
     }
 
-
+# queries asset_liabilities for balance sheet data
 def get_balance_sheet_from_db(year: int, period: str, db: Session) -> dict:
     try:
         period_index = int(period.replace("P", "")) - 1
@@ -397,9 +395,7 @@ def get_balance_sheet_from_db(year: int, period: str, db: Session) -> dict:
     }
 
 
-# ─────────────────────────────────────────────────────────────
-# Request schema
-# ─────────────────────────────────────────────────────────────
+
 
 class GenerateRequest(BaseModel):
     year:      int
@@ -407,10 +403,7 @@ class GenerateRequest(BaseModel):
     dashboard: str = "profitability"
 
 
-# ─────────────────────────────────────────────────────────────
-# Generate interpretation
-# ─────────────────────────────────────────────────────────────
-
+# generates a text interpretation of the selected dashboard and saves it to ai_insights
 @router.post("/generate/interpretation")
 def generate_interpretation(
     body: GenerateRequest,
@@ -679,17 +672,15 @@ Rules:
             dashboard=body.dashboard, year=body.year,
             period=body.period, content=json.dumps(fallback)
         )
-        db.add(insight); db.commit()
+        db.add(insight)
+        db.commit()
         return {"id": insight.id, "result": fallback, "savedAt": None}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─────────────────────────────────────────────────────────────
-# Generate recommendation
-# ─────────────────────────────────────────────────────────────
-
+# generates 3 strategic recommendations for the next fiscal period and saves them
 @router.post("/generate/recommendation")
 def generate_recommendation(
     body: GenerateRequest,
@@ -838,17 +829,16 @@ PROFIT AND LOSS BREAKDOWN:
             period=body.period, targetPeriod=target_period,
             content=json.dumps(fallback)
         )
-        db.add(insight); db.commit()
+        db.add(insight)
+        db.commit()
         return {"id": insight.id, "targetPeriod": target_period, "result": fallback, "savedAt": None}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─────────────────────────────────────────────────────────────
-# History
-# ─────────────────────────────────────────────────────────────
 
+# returns all insights history
 @router.get("/history")
 def get_history(
     dashboard:    Optional[str] = None,
@@ -875,10 +865,7 @@ def get_history(
     ]
 
 
-# ─────────────────────────────────────────────────────────────
-# Delete
-# ─────────────────────────────────────────────────────────────
-
+# deletes an insight
 @router.delete("/{insight_id}")
 def delete_insight(
     insight_id:   int,
@@ -895,14 +882,14 @@ def delete_insight(
     db.commit()
     return {"message": "Deleted successfully"}
 
+
+# queries all 4 tables to generate a global interpretation
 @router.post("/generate/global")
 def generate_global_interpretation(
     body: GenerateRequest,
     db:   Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from models.data_models import AssetLiability, CashFlow, Client
-
     active_months = get_active_months(body.period)
 
     # ── Revenue & Expenses ────────────────────────────────────
@@ -1113,7 +1100,8 @@ Rules:
             dashboard="global", year=body.year,
             period=body.period, content=json.dumps(fallback)
         )
-        db.add(insight); db.commit()
+        db.add(insight)
+        db.commit()
         return {"id": insight.id, "result": fallback, "savedAt": None}
 
     except Exception as e:

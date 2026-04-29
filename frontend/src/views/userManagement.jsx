@@ -71,7 +71,7 @@ export default function UserManagement() {
     if (!emailRegex.test(value)) return "Invalid email address.";
     return "";
   };
-
+ // Redirect non-leaders away
   const validatePassword = (value) => {
     if (!value) return "Password is required.";
     if (value.length < 8) return "Password must be at least 8 characters.";
@@ -79,12 +79,12 @@ export default function UserManagement() {
     if (!/[0-9]/.test(value)) return "Password must contain at least one number.";
     return "";
   };
-
+ // Updates form state and runs live validation in create mode
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(p => ({ ...p, [name]: value }));
     if (name === 'team' && value) setFormErrors(p => ({ ...p, team: '' }));
-    // live validation for create mode
+    // Run full validation before submission 
     if (modalMode === 'create') {
       if (name === 'telephone') setFormErrors(p => ({ ...p, telephone: validateTelephone(value) }));
       if (name === 'email')     setFormErrors(p => ({ ...p, email: validateEmail(value) }));
@@ -99,7 +99,7 @@ export default function UserManagement() {
       setFormErrors(p => ({ ...p, team: 'Team is required.' }));
       return;
     }
-
+// Run full validation before submitting in create mode
     if (modalMode === 'create') {
       const emailErr = validateEmail(form.email);
       const passErr  = validatePassword(form.password);
@@ -116,7 +116,7 @@ export default function UserManagement() {
         await accountService.createAccount(form);
         setMessage(`Account created! Credentials sent to ${form.email}.`);
       } else {
-        // Only send role and team — the only fields a leader can edit
+        // Edit only send role and team 
         await accountService.editAccount(selectedUser.id, {
           role: form.role,
           team: form.team,
@@ -131,7 +131,7 @@ export default function UserManagement() {
       setLoading(false);
     }
   };
-
+// Toggles account active/inactive status
   const handleToggle = async (id, isActive) => {
     if (!window.confirm(`${isActive ? 'Deactivate' : 'Activate'} this account?`)) return;
     try {
@@ -147,7 +147,7 @@ export default function UserManagement() {
       setError('Failed to update status');
     }
   };
-
+ // Filters the user list based on selected role, team and status
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
       if (filterRole   && u.role !== filterRole) return false;
@@ -190,7 +190,7 @@ export default function UserManagement() {
           <button onClick={fetchUsers} style={S.refreshBtn}>↺ Refresh</button>
         </div>
 
-        {/* ── Filter bar ── */}
+        {/* Filter bar */}
         <div style={S.filterBar}>
           <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={S.filterSelect}>
             <option value="">All Roles</option>
@@ -271,7 +271,7 @@ export default function UserManagement() {
 
               <form onSubmit={handleSubmit} noValidate style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
-                {/* ── Create-only fields ── */}
+                {/* Create-only fields */}
                 {modalMode === 'create' && (
                   <>
                     <Field label="Full Name">
@@ -325,14 +325,14 @@ export default function UserManagement() {
                   </>
                 )}
 
-                {/* ── Edit-only notice ── */}
+                {/* Edit-only notice */}
                 {modalMode === 'edit' && (
                   <div style={{ padding:'10px 14px', backgroundColor:'#FEF9EC', borderRadius:10, fontSize:12, color:'#92400E', borderLeft:'3px solid #F59E0B' }}>
                     ⚠ Personal information (name, email, phone, password) can only be changed by the account owner from their profile.
                   </div>
                 )}
 
-                {/* ── Shared fields: Role + Team ── */}
+                {/* Shared fields: Role + Team */}
                 <Field label="Role *">
                   <select name="role" value={form.role} onChange={handleChange} style={F.input} required>
                     <option value="member">Team Member</option>
@@ -363,7 +363,7 @@ export default function UserManagement() {
     </div>
   );
 }
-
+// Reusable labeled form field wrapper
 function Field({ label, children }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>

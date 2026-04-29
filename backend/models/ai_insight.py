@@ -13,9 +13,9 @@ class AIInsight(Base):
     id          = Column(Integer, primary_key=True, index=True)
     userId      = Column(Integer, ForeignKey("users.id"), nullable=False)
     insightType = Column(Enum(InsightType), nullable=False)
-    dashboard   = Column(String, nullable=False)   # "profitability", "balance_sheet", etc.
+    dashboard   = Column(String, nullable=False)   
     year        = Column(Integer, nullable=False)
     period      = Column(String, nullable=False)
-    targetPeriod = Column(String, nullable=True)   # next period, for recommendations only
-    content     = Column(Text, nullable=False)     # JSON string
+    targetPeriod = Column(String, nullable=True)  
+    content     = Column(Text, nullable=False)     
     createdAt   = Column(DateTime, server_default=func.now())

@@ -14,6 +14,7 @@ from controllers.aiInsightController import router as ai_insight_router
 
 app = FastAPI()                                 
 
+# Allow requests from the React dev server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
@@ -21,9 +22,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+# Creates all database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
+# Register all routers
 app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(data_router)

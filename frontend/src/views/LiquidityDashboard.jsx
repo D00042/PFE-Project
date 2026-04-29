@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import dashboardService from "../services/dashboardService.js";
 import LiquidityAIPanel from "../components/LiquidityAIPanel.jsx";
 import {
   LineChart, Line, BarChart, Bar,
@@ -10,6 +9,25 @@ import {
 } from "recharts";
 
 const API_URL = "http://127.0.0.1:8000";
+//Wraps long axis tick labels onto multiple lines
+const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
+  const words = String(payload.value).split(" ");
+  const lines = [];
+  let cur = "";
+  for (const word of words) {
+    const test = cur ? `${cur} ${word}` : word;
+    if (test.length > maxChars && cur) { lines.push(cur); cur = word; }
+    else { cur = test; }
+  }
+  if (cur) lines.push(cur);
+  return (
+    <g transform={`translate(${x},${y + 6})`}>
+      {lines.map((line, i) => (
+        <text key={i} x={0} y={i * (fontSize + 3)} textAnchor="middle" fill="#374151" fontSize={fontSize}>{line}</text>
+      ))}
+    </g>
+  );
+};
 
 const C = {
   navy:      "#092A5E",
@@ -40,6 +58,7 @@ const FISCAL_PERIODS = [
   { period: "P11", month: "August"    },
   { period: "P12", month: "September" },
 ];
+// number formatters
 
 const fmt     = (n) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(n);
 const fmtFull = (n) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
@@ -61,7 +80,15 @@ const CustomTooltip = ({ active, payload, label }) => {
 if (!document.getElementById("liquidity-print-style")) {
   const s = document.createElement("style");
   s.id = "liquidity-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #liquidity-print,#liquidity-print *{visibility:visible} #liquidity-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  s.textContent = `
+    @media print {
+      body * { visibility: hidden; }
+      #liquidity-print, #liquidity-print * { visibility: visible; }
+      #liquidity-print { position: absolute; left: 0; top: 0; width: 100%; }
+      button, .no-print { display: none !important; }
+      @page { size: A3 landscape; margin: 10mm; }
+    }
+  `;
   document.head.appendChild(s);
 }
 
@@ -78,9 +105,11 @@ export default function LiquidityDashboard() {
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState("");
 
+  // Keep compare year in sync with selected year
   useEffect(() => { setCompareYear(year - 1); }, [year]);
   useEffect(() => { fetchData(); }, [year, compareYear, period]);
 
+  // Fetches liquidity data for selected year, period and comparison year
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
@@ -130,6 +159,7 @@ export default function LiquidityDashboard() {
     });
   })();
 
+  // KPI card definitions with health check functions
   const kpiCards = [
   {
     key: "cashRatio",
@@ -187,7 +217,7 @@ export default function LiquidityDashboard() {
   return (
     <div style={S.page} id="liquidity-print">
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Liquidity</h1>
@@ -197,7 +227,7 @@ export default function LiquidityDashboard() {
         </div>
       </div>
 
-      {/* ── Controls ─────────────────────────────────────────────────────── */}
+      {/* Controls */}
       <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
@@ -237,10 +267,10 @@ export default function LiquidityDashboard() {
   })}
 </div>
 
-      {/* ── AI Panel ── */}
+      {/* AI Panel */}
       <LiquidityAIPanel year={year} period={period} />
 
-      {/* ── Waterfall ────────────────────────────────────────────────────── */}
+      {/* Waterfall */}
       <div style={{ padding: "24px 28px 8px" }}>
         <div style={S.chartCard}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -273,7 +303,7 @@ export default function LiquidityDashboard() {
             <ResponsiveContainer width="100%" height={340}>
               <ComposedChart data={waterfall} margin={{ bottom: 48, top: 24, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-20} textAnchor="end" interval={0} />
+                <XAxis dataKey="name" interval={0} height={48} tick={<WrappedTick maxChars={9} fontSize={10}/>}/>
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine y={0} stroke="#CBD5E1" />
@@ -301,7 +331,7 @@ export default function LiquidityDashboard() {
         </div>
       </div>
 
-      {/* ── Chart 1 + 2: Monthly Trend + Composition ─────────────────────── */}
+      {/* Chart 1 + 2: Monthly Trend + Composition */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Monthly Cash Flow Trend</p>
@@ -348,7 +378,7 @@ export default function LiquidityDashboard() {
         </div>
       </div>
 
-      {/* ── Chart 3 + 4: Cash Balance + Cash vs Payables ─────────────────── */}
+      {/* Chart 3 + 4: Cash Balance + Cash vs Payables */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Cash Balance Evolution</p>
@@ -389,7 +419,7 @@ export default function LiquidityDashboard() {
         </div>
       </div>
 
-      {/* ── Chart 5: Supplier Payments vs Cash Flow ──────────────────────── */}
+      {/* Chart 5: Supplier Payments vs Cash Flow */}
       <div style={{ padding: "0 28px", marginBottom: 32 }}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Supplier Payments vs Cash Flow</p>

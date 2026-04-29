@@ -8,7 +8,7 @@ class AIInsightCreate(BaseModel):
     year:         int
     period:       str
     targetPeriod: Optional[str] = None
-    content:      str           # JSON string
+    content:      str           
 
 class AIInsightOut(BaseModel):
     id:           int

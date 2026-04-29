@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg2.extras import RealDictCursor
 import psycopg2
-
-from database.db import DATABASE_URL        # plain string, no SQLAlchemy
+from database.db import DATABASE_URL        
 from models.user import User, UserRole
 from core.dependencies import require_roles
 from pydantic import BaseModel
 from core.email import send_dashboard_access_email
 
 router = APIRouter(prefix="/dashboard-access", tags=["dashboard-access"])
-
+# only these 4 values are accepted as dashboard names
 VALID_DASHBOARDS = {"profitability", "balance_sheet", "liquidity", "dpo_dso"}
 
 
@@ -18,10 +17,7 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
-
-# ---------------------------------------------------------------------------
-# Dependency — raw psycopg2 connection, zero SQLAlchemy machinery
-# ---------------------------------------------------------------------------
+# this controller uses raw psycopg2 connection instead of SQLAlchemy
 def get_pg():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
@@ -33,9 +29,8 @@ def get_pg():
     finally:
         conn.close()
 
-
+# runs a SELECT and returns rows as dicts
 def _q(conn, sql: str, params=None):
-    """Execute a query and return all rows as dicts."""
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, params)
         try:
@@ -43,13 +38,12 @@ def _q(conn, sql: str, params=None):
         except psycopg2.ProgrammingError:
             return []
 
-
+# runs INSERT or UPDATE
 def _run(conn, sql: str, params=None):
-    """Execute a DML statement (no result rows)."""
     with conn.cursor() as cur:
         cur.execute(sql, params)
 
-
+# creates a permissions row
 def _ensure_perm_rows(conn, user_ids: list):
     for uid in user_ids:
         _run(conn, """
@@ -60,7 +54,7 @@ def _ensure_perm_rows(conn, user_ids: list):
         """, (uid,))
     conn.commit()
 
-
+# returns permissions by user id
 def _fetch_perm_map(conn, user_ids: list) -> dict:
     if not user_ids:
         return {}
@@ -72,10 +66,11 @@ def _fetch_perm_map(conn, user_ids: list) -> dict:
     return {r["user_id"]: r for r in rows}
 
 
-# ---------------------------------------------------------------------------
+
 # Endpoints
-# ---------------------------------------------------------------------------
-@router.get("/leaders")
+
+# returns all user permissions to the manager
+@router.get("/users")
 def get_users_with_permissions(
     conn=Depends(get_pg),
     current_user: User = Depends(require_roles(["manager"]))
@@ -117,7 +112,7 @@ def get_users_with_permissions(
         for u in users
     ]
 
-
+# returns the current user's permissions
 @router.get("/my-permissions")
 def get_my_permissions(
     conn=Depends(get_pg),
@@ -142,8 +137,8 @@ def get_my_permissions(
         "dpo_dso":       bool(p.get("dpo_dso")),
     }
 
-
-@router.patch("/leaders/{user_id}")
+# manager grants or revokes access to a dashboard
+@router.patch("/users/{user_id}")
 def toggle_dashboard(
     user_id: int,
     body: ToggleRequest,

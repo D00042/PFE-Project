@@ -7,7 +7,7 @@ function Accueil() {
   const [user, setUser] = useState(null);
   const [visible, setVisible] = useState(false);
   
-
+//Load user from localStorage and trigger fade-in animation
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (!stored) { navigate('/login'); return; }
@@ -15,6 +15,7 @@ function Accueil() {
     setTimeout(() => setVisible(true), 80);
   }, [navigate]);
 
+// Clears session and redirects to login
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -31,7 +32,8 @@ function Accueil() {
     if (role === 'leader')  return { backgroundColor: '#70CBF4', color: 'white' };
     return { backgroundColor: '#E5E7EB', color: '#374151' };
   };
-  // define cards(models) with role based access
+
+ // Each card defines which roles can see it
   const allCards = [
     {
       key: 'data', roles: ['member', 'leader', 'manager'],
@@ -78,7 +80,7 @@ function Accueil() {
       route: '/dashboard-access', color: '#D40E14', lightBg: '#FEF2F2', label: 'Manage Access',
     },
   ];
-
+ // Filter cards based on the logged-in user's role
   const visibleCards = user ? allCards.filter(c => c.roles.includes(user.role)) : [];
   if (!user) return null;
 
@@ -145,7 +147,7 @@ function Accueil() {
     </div>
   );
 }
-
+// Individual module card with hover animation
 function NavCard({ card, delay, visible, onClick }) {
   const [hovered, setHovered] = useState(false);
   const accent = card.color === '#FEDB00' ? '#5a4a00' : card.color;
@@ -185,7 +187,7 @@ function NavCard({ card, delay, visible, onClick }) {
   );
 }
 
-// ── Style tokens (all pages import and reuse these conventions) ───────────────
+//Style tokens 
 const S = {
   // Layout
   page:         { minHeight: '100vh', backgroundColor: '#F3F4F6', fontFamily: 'Arial, sans-serif' },

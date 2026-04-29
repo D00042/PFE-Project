@@ -10,6 +10,7 @@ function AuthApp() {
 
   const navigate = useNavigate();
 
+   // Redirect to home if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user  = localStorage.getItem("user");
@@ -22,12 +23,11 @@ function AuthApp() {
     setLoading(true);
     setOutput("");
     try {
-      // ── CONTROLLER CALL: US 1.1 Basic Scenario ──────────────────
       const { data } = await authService.login({ email, password });
 
       localStorage.setItem("token", data.access_token);
 
-      // ── CONTROLLER CALL: US 1.1 — fetch role after login ────────
+      //fetch profile to store role with token
       const { data: meData } = await authService.getProfile();
       const userData = { id: meData.id, email: meData.email, role: meData.role };
       localStorage.setItem("user", JSON.stringify(userData));
@@ -35,10 +35,8 @@ function AuthApp() {
       navigate("/home");
 
     } catch (err) {
-      // ── Alternative Scenario 3.2: deactivated account ───────────
       if (err?.response?.status === 403) {
         setOutput("Your account has been disabled. Please contact your Team Leader.");
-      // ── Alternative Scenario 3.1: invalid credentials ───────────
       } else if (err?.response?.status === 401) {
         setOutput("Login failed: Invalid credentials.");
       } else {
@@ -48,7 +46,7 @@ function AuthApp() {
       setLoading(false);
     }
   };
-
+  // Submit on Enter key
   const handleKeyDown = (e) => {
     if (e.key === "Enter") login();
   };

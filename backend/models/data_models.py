@@ -67,13 +67,13 @@ class CashFlow(Base):
     updatedAt = Column(DateTime, onupdate=func.now())
 
 
-#  Client merges Supplier + Customer
+#  Client: Supplier + Customer
 class Client(Base):
     __tablename__ = "clients"
     id              = Column(Integer, primary_key=True, index=True)
     userId          = Column(Integer, ForeignKey("users.id"), nullable=False)
     clientName      = Column(String, nullable=False)
-    clientType      = Column(String, nullable=False)  # 'supplier' or 'customer'
+    clientType      = Column(String, nullable=False)  
     amount          = Column(Float, nullable=False)
     expenseCategory = Column(String, nullable=True)
     netDate         = Column(DateTime, nullable=True)

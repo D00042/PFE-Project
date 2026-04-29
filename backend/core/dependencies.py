@@ -8,7 +8,7 @@ from core.security import verify_token
 
 security = HTTPBearer()
 
-
+# Validates the Bearer token and returns the user
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
@@ -30,7 +30,7 @@ def get_current_user(
 
     return account.user
 
-
+# restricts access to the specified roles
 def require_roles(allowed_roles: list):
     def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role.value not in allowed_roles:

@@ -7,8 +7,8 @@ export default function ForgotPassword(){
   const [email,setEmail] = useState("");
   const [msg,setMsg] = useState("");
 
+  //Send reset email request to the backend
   const sendReset = async () => {
-
     const res = await fetch(`${API}/auth/forgot-password`,{
       method:"POST",
       headers:{

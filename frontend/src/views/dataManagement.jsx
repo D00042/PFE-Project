@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import dataService from '../services/dataService.js';
 import Logo from '../components/Logo.jsx';
 
+/* Fiscal period mapping and ordered months */
 const FISCAL_PERIOD_MAP = { 'October':'P1','November':'P2','December':'P3','January':'P4','February':'P5','March':'P6','April':'P7','May':'P8','June':'P9','July':'P10','August':'P11','September':'P12' };
 const FISCAL_MONTHS = ['October','November','December','January','February','March','April','May','June','July','August','September'];
 const EXPENSE_CATEGORIES = [
@@ -13,7 +14,7 @@ const EXPENSE_CATEGORIES = [
   'Computer Costs',
   'Professional Fees',
 ];
-
+//account codes mapped to labels and optional subcategories
 const REVENUE_EXPENSE_CODES = {
   'PLMT100000T': { label: 'Revenue' },
   'PLMT120000T': { label: 'Revenue' },
@@ -79,6 +80,7 @@ const CASHFLOW_LABELS = uniqueLabels(CASH_FLOW_CODES);
 
 const THIS_YEAR = new Date().getFullYear();
 
+//Calculates days outstanding and aging bucket from two dates
 function calcAging(netDate, targetDate) {
   if (!netDate || !targetDate) return { days: 0, agingDays: 'Not due', agingYear: null };
   const n = new Date(netDate), t = new Date(targetDate);
@@ -92,28 +94,28 @@ function calcAging(netDate, targetDate) {
   else { agingDays = '>180 days'; agingYear = t.getFullYear(); }
   return { days, agingDays, agingYear };
 }
-
+//Data categories and their API endpoints
 const CATEGORIES = [
   { key: 'revenue',  label: 'Revenue & Expenses',  endpoint: '/revenue-expenses' },
   { key: 'assets',   label: 'Assets & Liabilities', endpoint: '/asset-liabilities' },
   { key: 'cashflow', label: 'Cash Flow',            endpoint: '/cash-flows' },
   { key: 'clients',  label: 'Clients',              endpoint: '/clients' },
 ];
-
+//Filter definitions per category
 const FILTER_CONFIG = {
   revenue:  [{ key: 'year', label: 'Year' }, { key: 'month', label: 'Month', options: FISCAL_MONTHS }, { key: 'type', label: 'Type', options: ['Actual', 'Budget'] }, { key: 'frequency', label: 'Frequency', options: ['periodic', 'year to date'] }],
   assets:   [{ key: 'year', label: 'Year' }, { key: 'month', label: 'Month', options: FISCAL_MONTHS }, { key: 'category', label: 'Category', options: ['Assets', 'Equity', 'Liabilities'] }],
   cashflow: [{ key: 'year', label: 'Year' }, { key: 'month', label: 'Month', options: FISCAL_MONTHS }],
   clients:  [{ key: 'year', label: 'Year' }, { key: 'clientType', label: 'Type', options: ['supplier', 'customer'] }, { key: 'agingDays', label: 'Aging', options: ['Not due', '0-30 days', '31-61 days', '61-90 days', '90-180 days', '>180 days'] }],
 };
-
+//Default empty form state per category
 const emptyForms = {
   revenue:  { label: '', code: '', year: '', month: 'October', value: '', frequency: 'periodic', type: 'Actual', category: '' },
   assets:   { label: '', code: '', category: '', subCategory: '', year: '', month: 'October', value: '' },
   cashflow: { label: '', code: '', year: '', month: 'October', value: '' },
   clients:  { clientName: '', clientType: 'supplier', amount: '', expenseCategory: '', netDate: '', targetDate: '', year: '', address: '', telephone: '' },
 };
-
+/* Validated year input with inline feedback */
 function YearField({ value, onChange }) {
   const yearVal = parseInt(value);
   const isEmpty = !value;
@@ -168,17 +170,17 @@ export default function DataManagement() {
   const currentUser    = useMemo(() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } }, []);
   const currentCat     = CATEGORIES.find(c => c.key === activeCategory);
   const currentFilters = FILTER_CONFIG[activeCategory] || [];
-
+//aging preview while filling in client dates
   const liveAging = useMemo(() => {
     if (activeCategory !== 'clients' || !form.netDate || !form.targetDate) return null;
     return calcAging(form.netDate, form.targetDate);
   }, [activeCategory, form.netDate, form.targetDate]);
-
+//Reset filters and reload when category changes
   useEffect(() => {
     setSearchQuery(''); setActiveFilters({}); setShowFilters(false); fetchEntries();
   }, [activeCategory]);
 
-  // ── CONTROLLER CALL: fetch all entries for the active category ────────────
+  //Fetch all entries for the active category
   const fetchEntries = async () => {
     setLoading(true); setError('');
     try {
@@ -206,6 +208,7 @@ export default function DataManagement() {
 
   const activeFilterCount = Object.values(activeFilters).filter(Boolean).length + (searchQuery ? 1 : 0);
 
+  //Auto-fill code and category when a label is selected
   const handleLabelChange = (label) => {
     let fill = { label };
     if (activeCategory === 'revenue') {
@@ -238,6 +241,7 @@ export default function DataManagement() {
   };
 
   const openCreate = () => { setModalMode('create'); setForm(emptyForms[activeCategory]); setShowModal(true); setError(''); setMessage(''); };
+  //Pre-fill form with existing entry data for editing
   const openEdit   = (entry) => {
     setModalMode('edit'); setSelectedEntry(entry);
     const f = { ...entry };
@@ -245,8 +249,7 @@ export default function DataManagement() {
     if (f.targetDate) f.targetDate = f.targetDate.split('T')[0];
     setForm(f); setShowModal(true); setError(''); setMessage('');
   };
-
-  // ── CONTROLLER CALL: create or update an entry ────────────────────────────
+//Create or update an entry
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true); setError('');
 
@@ -282,7 +285,7 @@ export default function DataManagement() {
     }
   };
 
-  // ── CONTROLLER CALL: delete an entry ─────────────────────────────────────
+  //Delete an entry after confirmation
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this entry?')) return;
     try {
@@ -312,7 +315,7 @@ export default function DataManagement() {
     if (activeCategory === 'clients')  return [e.id, e.clientName, e.clientType, fmt(e.amount), e.expenseCategory || '—', fmtD(e.netDate), fmtD(e.targetDate), e.daysOutstanding ?? '—', e.agingDays || '—', e.agingYear || '—'];
     return [];
   };
-
+//Form fields rendered per active category
   const renderFields = () => {
 
     if (activeCategory === 'revenue') return (

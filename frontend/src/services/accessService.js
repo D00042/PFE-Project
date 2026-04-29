@@ -2,15 +2,15 @@ import { API_BASE_URL, getAuthHeaders, handleResponse } from './apiUtils.js';
 
 const accessService = {
 
-  getAllLeadersWithPermissions: async () => {
-    const response = await fetch(`${API_BASE_URL}/dashboard-access/leaders`, {
+  getAllUsersWithPermissions: async () => {
+    const response = await fetch(`${API_BASE_URL}/dashboard-access/users`, {
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
   },
 
   toggleDashboardAccess: async (userId, dashboard, enabled) => {
-    const response = await fetch(`${API_BASE_URL}/dashboard-access/leaders/${userId}`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-access/users/${userId}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({ dashboard, enabled }),

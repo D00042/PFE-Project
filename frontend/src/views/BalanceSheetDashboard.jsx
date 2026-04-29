@@ -37,6 +37,7 @@ const FISCAL_PERIODS = [
   { period:"P11", month:"August"    }, { period:"P12", month:"September" },
 ];
 
+// number formatters
 const fmt     = (n) => new Intl.NumberFormat("en-US", { notation:"compact", maximumFractionDigits:1 }).format(n);
 const fmtFull = (n) => new Intl.NumberFormat("en-US", { maximumFractionDigits:0 }).format(n);
 const fmtK    = (n) => {
@@ -46,11 +47,12 @@ const fmtK    = (n) => {
   if (abs >= 1_000)     return (n / 1_000).toFixed(1) + "K";
   return n.toFixed(0);
 };
-
+//Label styles
 const lbTop     = { fontSize:8, fill:COLORS.navy, fontWeight:600 };
 const lbTopGrey = { fontSize:8, fill:COLORS.grey, fontWeight:500 };
 const lbRight   = { fontSize:8, fill:COLORS.navy, fontWeight:600 };
 
+//Wraps long axis tick labels onto multiple lines
 const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
   const words = String(payload.value).split(" ");
   const lines = [];
@@ -70,6 +72,7 @@ const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
   );
 };
 
+//Renders percentage labels inside pie slices
 const RADIAN = Math.PI / 180;
 const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
   if (percent < 0.05) return null;
@@ -84,11 +87,21 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
 };
 
 if (!document.getElementById("bs-print-style")) {
-  const s = document.createElement("style"); s.id = "bs-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #bs-print,#bs-print *{visibility:visible} #bs-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  const s = document.createElement("style");
+  s.id = "bs-print-style";
+  s.textContent = `
+    @media print {
+      body * { visibility: hidden; }
+      #bs-print, #bs-print * { visibility: visible; }
+      #bs-print { position: absolute; left: 0; top: 0; width: 100%; }
+      button, .no-print { display: none !important; }
+      @page { size: A3 landscape; margin: 10mm; }
+    }
+  `;
   document.head.appendChild(s);
 }
 
+//KPI card with horizontal bar comparison
 function KpiBar({ value, prevValue, unit = "", up, formatter, maxVal = 100 }) {
   const display     = formatter ? formatter(value)     : value.toFixed(1);
   const prevDisplay = formatter ? formatter(prevValue) : prevValue.toFixed(1);
@@ -113,7 +126,7 @@ function KpiBar({ value, prevValue, unit = "", up, formatter, maxVal = 100 }) {
     </>
   );
 }
-
+//Horizontal bar chart card
 function HBarCard({ title, subtitle, data, height = 280 }) {
   if (!data?.length) return (
     <div style={S.chartCard}>
@@ -145,7 +158,7 @@ function HBarCard({ title, subtitle, data, height = 280 }) {
     </div>
   );
 }
-
+//Vertical bar chart card
 function VBarCard({ title, subtitle, data, height = 280 }) {
   if (!data?.length) return (
     <div style={S.chartCard}>
@@ -178,7 +191,7 @@ function VBarCard({ title, subtitle, data, height = 280 }) {
     </div>
   );
 }
-
+//Donut chart comparing current vs previous year
 function DonutCompareCard({ title, currentVal, prevVal, color, prevColor }) {
   const total   = Math.max(currentVal + prevVal, 1);
   const currPct = Math.round((currentVal / total) * 100);
@@ -227,6 +240,7 @@ function DonutCompareCard({ title, currentVal, prevVal, color, prevColor }) {
   );
 }
 
+//Filterable bar chart for balance sheet totals
 function BalanceSheetTotalsChart({ charts, currentYear }) {
   const [totalsYear,     setTotalsYear]     = useState(currentYear);
   const [totalsCategory, setTotalsCategory] = useState("assets");
@@ -353,7 +367,7 @@ export default function BalanceSheetDashboard() {
   return (
     <div style={S.page} id="bs-print">
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Balance Sheet Overview</h1>
@@ -363,7 +377,7 @@ export default function BalanceSheetDashboard() {
         </div>
       </div>
 
-      {/* ── Controls ── */}
+      {/* Controls */}
       <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
@@ -381,7 +395,7 @@ export default function BalanceSheetDashboard() {
         <span style={S.currencyLabel}>Values in EUR</span>
       </div>
 
-      {/* ── KPI Cards ── */}
+      {/* KPI Cards */}
       <div style={S.kpiRow}>
         <div style={S.kpiCard}>
           <div style={S.kpiHeader}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={COLORS.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M3 9l9-6 9 6M4 20h16"/><path d="M6 9l-3 7h6L6 9zM18 9l-3 7h6l-3-7z"/></svg><p style={S.kpiTitle}>Equity Ratio</p></div>
@@ -415,10 +429,10 @@ export default function BalanceSheetDashboard() {
         </div>
       </div>
 
-      {/* ── AI Panel ── */}
+      {/* AI Panel */}
       <BalanceSheetAIPanel year={year} period={period} />
 
-      {/* ── Row 1: Key Totals (left half) + Two Pie Charts stacked (right half) ── */}
+      {/* Row 1: Key Totals (left half) + Two Pie Charts stacked (right half) */}
       <div style={S.section}><p style={S.sectionHeading}>Balance Sheet Overview</p></div>
       <div style={{ display:"grid", gridTemplateColumns:"1.6fr 1fr", gap:16, padding:"8px 28px 16px", alignItems:"stretch" }}>
 
@@ -470,7 +484,7 @@ export default function BalanceSheetDashboard() {
 
       </div>
 
-      {/* ── Row 2: Two Donut Charts ── */}
+      {/* Row 2: Two Donut Charts */}
       <div style={S.section}><p style={S.sectionHeading}>Trade Position</p></div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, padding:"8px 28px",alignItems: "start" }}>
         <div style={S.chartCard}>
@@ -493,7 +507,7 @@ export default function BalanceSheetDashboard() {
         </div>
       </div>
 
-      {/* ── Row 3: Non-Current Assets + Current Assets ── */}
+      {/* Row 3: Non-Current Assets + Current Assets */}
       <div style={S.section}><p style={S.sectionHeading}>Detailed Breakdowns by Category</p></div>
       <div style={S.row2}>
         <div style={S.chartCard}>
@@ -521,7 +535,7 @@ export default function BalanceSheetDashboard() {
         </div>
       </div>
 
-      {/* ── Row 4: Non-Current Liabilities + Current Liabilities ── */}
+      {/* Row 4: Non-Current Liabilities + Current Liabilities */}
       <div style={{ ...S.row2, marginBottom:32 }}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Non-Current Liabilities Details</p>

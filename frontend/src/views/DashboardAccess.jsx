@@ -17,9 +17,9 @@ export default function DashboardAccess() {
   const [confirmation, setConfirmation] = useState(null)
   const navigate = useNavigate()
 
+  //Load all users with their permissions
   useEffect(() => {
-    // ── CONTROLLER CALL: US 1.5.3 — View all leaders with permissions ──
-    accessService.getAllLeadersWithPermissions()
+    accessService.getAllUsersWithPermissions()
       .then(({ data }) => { setLeaders(data); setLoading(false) })
       .catch(() => { showToast("Failed to load data.", "error"); setLoading(false) })
   }, [])
@@ -27,7 +27,7 @@ export default function DashboardAccess() {
   const toggle = async (userId, dashboard, currentValue) => {
     const enabled = !currentValue
 
-    // Show confirmation when ENABLING access
+    // Show confirmation when granting access
     if (enabled) {
       const user = leaders.find(u => u.id === userId)
       const dashboardLabel = DASHBOARDS.find(d => d.key === dashboard)?.label
@@ -40,7 +40,7 @@ export default function DashboardAccess() {
       return
     }
 
-    // Proceed with toggle (for disabling)
+    // revoke access with toggle
     await executeToggle(userId, dashboard, currentValue)
   }
 
@@ -57,7 +57,7 @@ export default function DashboardAccess() {
     setPending(p => ({ ...p, [key]: true }))
 
     try {
-      // ── CONTROLLER CALL: US 1.5.1 / 1.5.2 — Grant or revoke access ──
+      //Grant or revoke dashboard access
       const { data } = await accessService.toggleDashboardAccess(userId, dashboard, enabled)
       showToast(data.message, "success")
     } catch {
