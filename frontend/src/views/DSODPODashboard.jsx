@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import dashboardService from "../services/dashboardService.js";
 import DSODPOAIPanel from "../components/DSODPOAIPanel.jsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -8,6 +7,25 @@ import {
 } from "recharts";
 
 const API_URL = "http://127.0.0.1:8000";
+
+const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
+  const words = String(payload.value).split(" ");
+  const lines = [];
+  let cur = "";
+  for (const word of words) {
+    const test = cur ? `${cur} ${word}` : word;
+    if (test.length > maxChars && cur) { lines.push(cur); cur = word; }
+    else { cur = test; }
+  }
+  if (cur) lines.push(cur);
+  return (
+    <g transform={`translate(${x},${y + 6})`}>
+      {lines.map((line, i) => (
+        <text key={i} x={0} y={i * (fontSize + 3)} textAnchor="middle" fill="#374151" fontSize={fontSize}>{line}</text>
+      ))}
+    </g>
+  );
+};
 
 const C = {
   navy:    "#092A5E",
@@ -63,7 +81,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     </div>
   );
 };
-
+// SVG gauge that fills based on value relative to max
 const GaugeChart = ({ value, max, color, label }) => {
   const pct      = Math.min(value / max, 1);
   const angle    = pct * 180;
@@ -100,7 +118,15 @@ const GaugeChart = ({ value, max, color, label }) => {
 if (!document.getElementById("dso-print-style")) {
   const s = document.createElement("style");
   s.id = "dso-print-style";
-  s.textContent = `@media print { body *{visibility:hidden} #dso-print,#dso-print *{visibility:visible} #dso-print{position:absolute;left:0;top:0;width:100%} button{display:none!important} .no-print{display:none!important} }`;
+  s.textContent = `
+    @media print {
+      body * { visibility: hidden; }
+      #dso-print, #dso-print * { visibility: visible; }
+      #dso-print { position: absolute; left: 0; top: 0; width: 100%; }
+      button, .no-print { display: none !important; }
+      @page { size: A3 landscape; margin: 10mm; }
+    }
+  `;
   document.head.appendChild(s);
 }
 
@@ -120,6 +146,7 @@ export default function DSODPODashboard() {
 
   useEffect(() => { fetchData(); }, [year, period]);
 
+  // Fetches DSO/DPO data for selected year and period
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
@@ -172,7 +199,7 @@ export default function DSODPODashboard() {
   const dso = kpis.dso?.current ?? 0;
   const dpo = kpis.dpo?.current ?? 0;
 
-  // Filter based on category
+  // Filter dashboardbased on category
   const showCustomer = category === "all" || category === "customer";
   const showSupplier = category === "all" || category === "supplier";
 
@@ -187,7 +214,7 @@ export default function DSODPODashboard() {
   return (
     <div style={S.page} id="dso-print">
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>DSO & DPO</h1>
@@ -197,7 +224,7 @@ export default function DSODPODashboard() {
         </div>
       </div>
 
-      {/* ── Controls ─────────────────────────────────────────────────────── */}
+      {/* Controls */}
       <div style={S.controlBar} className="no-print">
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
@@ -214,7 +241,7 @@ export default function DSODPODashboard() {
           </div>
         </div>
 
-        {/* ── Category filter ── */}
+        {/* Category filter */}
         <div style={S.categoryWrap}>
           <span style={S.periodLabel}>Category:</span>
           <div style={S.categoryTabs}>
@@ -235,7 +262,7 @@ export default function DSODPODashboard() {
         <span style={S.currencyLabel}>Actual Values in EUR</span>
       </div>
 
-      {/* ── Count Cards ──────────────────────────────────────────────────── */}
+      {/* Count Cards */}
       <div style={S.countRow}>
         <div style={{ ...S.countCard, borderTop: `4px solid ${C.navy}` }}>
           <p style={S.countLabel}>Total Clients</p>
@@ -254,10 +281,10 @@ export default function DSODPODashboard() {
         </div>
       </div>
 
-      {/* ── AI Panel ── */}
+      {/* AI Panel */}
       <DSODPOAIPanel year={year} period={period} />
 
-      {/* ── DSO / DPO Section ────────────────────────────────────────────── */}
+      {/* DSO / DPO Section */}
       <div style={S.dsoSection}>
 
         {/* DSO side */}
@@ -320,19 +347,27 @@ export default function DSODPODashboard() {
                 <p style={S.miniTitle}>Supplier Aging Overdue</p>
                 {(!supplierAgingByYear || supplierAgingByYear.length === 0) ? (
                   <p style={{ color: C.grey, fontSize: 12, padding: "20px 0" }}>No data</p>
-                ) : (
-                  <ResponsiveContainer width={260} height={180}>
-                    <BarChart data={supplierAgingByYear} margin={{ top: 20, bottom: 8 }}>
-                      <XAxis dataKey="bucket" tick={{ fontSize: 8 }} />
-                      <YAxis tick={{ fontSize: 8 }} tickFormatter={fmt} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend iconSize={8} wrapperStyle={{ fontSize: 9 }} />
-                      <Bar dataKey={String(yr)}      name={String(yr)}      fill={C.purple}  radius={[2,2,0,0]} label={{ position: "top", fontSize: 7, formatter: fmt }} />
-                      <Bar dataKey={String(prevYr)}  name={String(prevYr)}  fill={C.purpleL} radius={[2,2,0,0]} />
-                      <Bar dataKey={String(prev2Yr)} name={String(prev2Yr)} fill={C.purple2} radius={[2,2,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+                ) : (() => {
+                  const byYear = [yr, prevYr, prev2Yr].map(y => ({
+                    year: String(y),
+                    amount: (supplierAgingByYear || []).reduce((sum, row) => sum + (row[String(y)] || 0), 0),
+                  })).filter(d => d.amount > 0);
+                  return (
+                    <ResponsiveContainer width={260} height={180}>
+                      <BarChart data={byYear} margin={{ top: 20, bottom: 8 }}>
+                        <XAxis dataKey="year" tick={{ fontSize: 9 }} />
+                        <YAxis tick={{ fontSize: 8 }} tickFormatter={fmt} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="amount" name="Total" radius={[3,3,0,0]}
+                          label={{ position: "top", fontSize: 7, formatter: fmt }}>
+                          {byYear.map((_, i) => (
+                            <Cell key={i} fill={[C.purple, C.purpleL, C.purple2][i % 3]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
               </div>
               <div style={S.miniCard}>
                 <GaugeChart value={Math.round(dpo)} max={Math.max(Math.round(dpo) * 2, 1000)} color={C.red} label="DPO" />
@@ -345,7 +380,7 @@ export default function DSODPODashboard() {
         )}
       </div>
 
-      {/* ── Row 1: Top Unpaid ─────────────────────────────────────────────── */}
+      {/* Row 1: Top Unpaid */}
       <div style={S.row2}>
         {showCustomer && (
           <div style={S.chartCard}>
@@ -353,7 +388,7 @@ export default function DSODPODashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={topCustomers} margin={{ bottom: 48, top: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
+                <XAxis dataKey="name" interval={0} height={48} tick={<WrappedTick maxChars={9} fontSize={9}/>}/>
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="amount" name="Amount" fill={C.navy} radius={[3,3,0,0]}
@@ -376,7 +411,7 @@ export default function DSODPODashboard() {
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={topSuppliers} margin={{ bottom: 48, top: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" interval={0} />
+                    <XAxis dataKey="name" interval={0} height={48} tick={<WrappedTick maxChars={9} fontSize={9}/>}/>
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar
@@ -384,6 +419,7 @@ export default function DSODPODashboard() {
                       name="Amount"
                       radius={[3,3,0,0]}
                       label={{ position: "top", fontSize: 8, formatter: fmt }}
+                      // Clicking a bar selects that supplier and shows its aging breakdown
                       onClick={(data) => {
                         const name = data?.name;
                         if (!name) return;
@@ -402,7 +438,7 @@ export default function DSODPODashboard() {
                   </BarChart>
                 </ResponsiveContainer>
 
-                {/* Aging Pie — shown when a supplier is selected */}
+                {/* Aging Pie: shown when a supplier is selected */}
                 {selectedSupplier && (() => {
                   const detail = data?.supplierAgingDetail?.[selectedSupplier] || [];
                   const pieData = detail.map((d, i) => ({
@@ -487,7 +523,7 @@ export default function DSODPODashboard() {
         )}
       </div>
 
-      {/* ── Row 2: Delay Distribution ─────────────────────────────────────── */}
+      {/* Row 2: Delay Distribution */}
       <div style={S.row2}>
         {showCustomer && (
           <div style={S.chartCard}>
@@ -531,7 +567,7 @@ export default function DSODPODashboard() {
         )}
       </div>
 
-      {/* ── Row 3: Aging Pie ──────────────────────────────────────────────── */}
+      {/* Row 3: Aging Pie */}
       <div style={{ ...S.row2, marginBottom: 32 }}>
         {showCustomer && (
           <div style={S.chartCard}>

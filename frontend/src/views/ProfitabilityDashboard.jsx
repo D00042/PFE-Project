@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import dashboardService from '../services/dashboardService';
 import ProfitabilityAIPanel from "../components/ProfitabilityAIPanel";
 import GlobalAIPanel from "../components/GlobalAIPanel";
 import {
@@ -33,6 +32,7 @@ const COLORS = {
 
 const PIE_COLORS = ["#1B5EA6","#007B8A","#C96A00","#5B2D8E","#C8102E","#001F5B"];
 
+// Fiscal year mapping October (P1) to September (P12)
 const FISCAL_PERIODS = [
   { period:"P1",  month:"October"   }, { period:"P2",  month:"November"  },
   { period:"P3",  month:"December"  }, { period:"P4",  month:"January"   },
@@ -42,6 +42,7 @@ const FISCAL_PERIODS = [
   { period:"P11", month:"August"    }, { period:"P12", month:"September" },
 ];
 
+// Number formatters (to show full or compact numbers)
 const fmt     = (n) => new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(n);
 const fmtFull = (n) => new Intl.NumberFormat("en-US",{maximumFractionDigits:0}).format(n);
 
@@ -49,6 +50,7 @@ const lbTop     = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
 const lbTopGrey = { fontSize:8, fill:COLORS.grey,  fontWeight:500 };
 const lbRight   = { fontSize:8, fill:COLORS.navy,  fontWeight:600 };
 
+// Wraps long axis labels onto multiple lines
 const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
   const words = String(payload.value).split(" ");
   const lines = [];
@@ -67,7 +69,7 @@ const WrappedTick = ({ x, y, payload, maxChars = 10, fontSize = 10 }) => {
     </g>
   );
 };
-
+// Renders percentage labels inside pie slices
 const RADIAN = Math.PI / 180;
 const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
   if (percent < 0.05) return null;
@@ -81,37 +83,24 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
   );
 };
 
-const exportPDF = () => {
-  const originalZoom = document.body.style.zoom;
-  document.body.style.zoom = "100%";
-  window.print();
-  document.body.style.zoom = originalZoom;
-};
+const exportPDF = () => window.print();
+
 if (!document.getElementById("prof-print-style")) {
   const s = document.createElement("style");
   s.id = "prof-print-style";
   s.textContent = `
-  @media print {
-    body * { visibility: hidden; }
-    #prof-print, #prof-print * { visibility: visible; }
-    #prof-print { 
-      position: absolute; 
-      left: 0; 
-      top: 0; 
-      width: 100%;
+    @media print {
+      body * { visibility: hidden; }
+      #prof-print, #prof-print * { visibility: visible; }
+      #prof-print { position: absolute; left: 0; top: 0; width: 100%; }
+      button, .no-print { display: none !important; }
+      @page { size: A3 landscape; margin: 10mm; }
     }
-    button { display: none !important; }
-    .no-print { display: none !important; }
-    @page {
-      size: A3 landscape;
-      margin: 10mm;
-    }
-  }
-`;
+  `;
   document.head.appendChild(s);
 }
 
-// ── Overhead category filter options ─────────────────────────────────────────
+// Overhead category filter options 
 const OVERHEAD_CATS = [
   "All",
   "Property Costs",
@@ -134,10 +123,11 @@ export default function ProfitabilityDashboard() {
 const [loadingAI, setLoadingAI]           = useState(false);
 const [aiError, setAiError]               = useState("");
 
-  // ── Individual chart slicers ──────────────────────────────────────────────
+  // Per-chart slicers
   const [overheadCat,  setOverheadCat]  = useState("All");   // Overheads filter
   const [cashFlowType, setCashFlowType] = useState("All");   // Rev vs CF filter: All | positive | negative
 
+  // Refetch whenever year or period changes
   useEffect(() => { fetchData(); }, [year, period]);
 
   const fetchData = async () => {
@@ -154,7 +144,7 @@ const [aiError, setAiError]               = useState("");
     finally { setLoading(false); }
   };
   
-  // ── Waterfall (now column + line) ─────────────────────────────────────────
+   // Builds waterfall steps with a cumulative line
   const waterfallData = useMemo(() => {
     if (!data) return [];
     const pl  = data.plSummary;
@@ -178,7 +168,7 @@ const [aiError, setAiError]               = useState("");
       return { ...s, bar: Math.abs(s.value), fill: s.value >= 0 ? COLORS.positive : COLORS.negative, cumulative: running };
     });
   }, [data]);
-
+// Formats margin KPIs for the grouped bar chart
   const marginsData = useMemo(() => {
     if (!data) return [];
     return [
@@ -188,7 +178,7 @@ const [aiError, setAiError]               = useState("");
     ];
   }, [data]);
 
-  // ── Overheads sorted descending + filtered ────────────────────────────────
+  // Filters and sorts overheads by category and value descending
   const sortedOverheads = useMemo(() => {
     if (!data) return [];
     const base = overheadCat === "All"
@@ -197,7 +187,7 @@ const [aiError, setAiError]               = useState("");
     return [...base].sort((a, b) => b.current - a.current);
   }, [data, overheadCat]);
 
-  // ── Revenue vs Cash Flow data ─────────────────────────────────────────────
+  // Maps monthly trend to revenue vs EBIT
   const revVsCFData = useMemo(() => {
     if (!data?.monthlyTrend) return [];
     return data.monthlyTrend.map(m => ({
@@ -218,6 +208,7 @@ const [aiError, setAiError]               = useState("");
 
   const { kpis, plSummary, monthlyTrend, expensesBreakdown } = data;
 
+// KPI card definitions with icons
   const kpiCards = [
     { label:"Gross Profit Margin", key:"grossMargin",     unit:"%",
       icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.navy} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> },
@@ -234,7 +225,7 @@ const [aiError, setAiError]               = useState("");
   return (
     <div style={S.page} id="prof-print">
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div style={S.topBar}>
         <button style={S.backBtn} onClick={() => navigate("/home")}>←</button>
         <h1 style={S.pageTitle}>Profitability Dashboard</h1>
@@ -244,7 +235,7 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Controls ── */}
+      {/* Controls */}
       <div style={S.controlBar}>
         <div style={S.yearTabs}>
           {[year - 1, year].map(y => (
@@ -261,9 +252,9 @@ const [aiError, setAiError]               = useState("");
         </div>
         <span style={S.currencyLabel}>Values in EUR</span>
       </div>
-      {/* ── Global AI Panel ── */}
+      {/* Global AI Panel */}
 <GlobalAIPanel year={year} period={period} />
-      {/* ── KPI Cards ── */}
+      {/* KPI Cards */}
       <div style={S.kpiRow}>
         {kpiCards.map(({ label, key, unit, icon }) => {
           const curr = kpis[key]?.current  ?? 0;
@@ -287,7 +278,7 @@ const [aiError, setAiError]               = useState("");
       </div>
       <ProfitabilityAIPanel year={year} period={period} />
 
-   {/* ── Row 1: P&L Summary + Overheads ── */}
+   {/* Row 1: P&L Summary + Overheads */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Profit &amp; Loss Summary</p>
@@ -350,7 +341,7 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Row 2: Waterfall + Expenses Pie ── */}
+      {/* Row 2: Waterfall + Expenses Pie */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>P&amp;L Waterfall — Revenue to EBIT</p>
@@ -396,7 +387,7 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Row 3: Revenue vs Cash Flow + Monthly EBIT Trend ── */}
+      {/* Row 3: Revenue vs Cash Flow + Monthly EBIT Trend */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
@@ -460,7 +451,7 @@ const [aiError, setAiError]               = useState("");
         </div>
       </div>
 
-      {/* ── Row 4: Revenue vs Budget + Expense vs Net Profit ── */}
+      {/* Row 4: Revenue vs Budget + Expense vs Net Profit */}
       <div style={S.row2}>
         <div style={S.chartCard}>
           <p style={S.chartTitle}>Revenue Forecast</p>

@@ -101,7 +101,7 @@ const TRANSITION       = "0.22s cubic-bezier(0.4, 0, 0.2, 1)";
 
 export default function DashboardLayout() {
   const [collapsed,    setCollapsed]    = useState(false);
-  const [permissions,  setPermissions]  = useState(null);  // null = loading
+  const [permissions,  setPermissions]  = useState(null);  
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -110,7 +110,7 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     if (isManager) {
-      // Managers see everything — no need to fetch
+      // Managers see everything no need to fetch
       setPermissions({ profitability: true, balance_sheet: true, liquidity: true, dpo_dso: true });
       return;
     }
@@ -142,7 +142,7 @@ export default function DashboardLayout() {
   return (
     <div style={S.root}>
 
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      {/* Sidebar */}
       <aside style={{ ...S.sidebar, width: sidebarWidth }}>
 
         {/* Logo + collapse toggle */}
@@ -160,7 +160,7 @@ export default function DashboardLayout() {
             onClick={() => setCollapsed(c => !c)}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {/* Hamburger / arrow icon */}
+            {/* arrow icon */}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                  width="18" height="18"
@@ -181,7 +181,6 @@ export default function DashboardLayout() {
         {/* Dashboard nav items */}
         <nav style={S.nav}>
           {permissions === null ? (
-            // Loading state — show skeleton placeholders
             [1,2,3,4].map(i => (
               <div key={i} style={{ height: 40, margin: "2px 8px", borderRadius: 10, background: "rgba(255,255,255,0.06)" }} />
             ))
@@ -246,7 +245,7 @@ export default function DashboardLayout() {
 
       </aside>
 
-      {/* ── Main content (the active dashboard renders here) ─────────────── */}
+      {/* Main content (the active dashboard renders here) */}
       <main style={S.main}>
         {isAccessDenied ? (
           <div style={S.deniedWrap}>
@@ -276,9 +275,7 @@ export default function DashboardLayout() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ④ Styles
-// ─────────────────────────────────────────────────────────────────────────────
+// Styles
 const S = {
   root: {
     display:  "flex",

@@ -4,8 +4,8 @@ from email.mime.multipart import MIMEMultipart
 
 SMTP_HOST     = "smtp.gmail.com"
 SMTP_PORT     = 587
-SMTP_USER     = "maryemgassri3@gmail.com"   # ← replace
-SMTP_PASSWORD = "hxho ukmy bnmp wxsx"      # ← replace
+SMTP_USER     = "maryemgassri3@gmail.com"  
+SMTP_PASSWORD = "hxho ukmy bnmp wxsx"      
 FROM_EMAIL    = "noreply@tui.com"
 
 DASHBOARD_LABELS = {
@@ -15,7 +15,7 @@ DASHBOARD_LABELS = {
     "dpo_dso":       "DPO & DSO",
 }
 
-
+# Sends a password reset link to the user's email
 def send_reset_email(email: str, token: str):
     reset_link = f"http://localhost:5173/reset-password/{token}"
     msg = MIMEMultipart("alternative")
@@ -33,7 +33,7 @@ def send_reset_email(email: str, token: str):
     msg.attach(MIMEText(body, "html"))
     _send(email, msg)
 
-
+# Notifies the user that their password was successfully changed
 def send_password_changed_email(email: str, full_name: str = ""):
     name = full_name or email
     msg = MIMEMultipart("alternative")
@@ -54,7 +54,7 @@ def send_password_changed_email(email: str, full_name: str = ""):
     msg.attach(MIMEText(body, "html"))
     _send(email, msg)
 
-
+# Notifies the user that they have been granted access to a dashboard
 def send_dashboard_access_email(email: str, full_name: str, dashboard: str):
     label = DASHBOARD_LABELS.get(dashboard, dashboard)
     name  = full_name or email
@@ -76,8 +76,8 @@ def send_dashboard_access_email(email: str, full_name: str, dashboard: str):
     msg.attach(MIMEText(body, "html"))
     _send(email, msg)
 
-
-def _send_credentials_email(email: str, full_name: str, password: str):
+# Sends login credentials to a newly created user
+def send_credentials_email(email: str, full_name: str, password: str):
     name = full_name or email
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Your TUI Platform Account"
@@ -97,7 +97,7 @@ def _send_credentials_email(email: str, full_name: str, password: str):
     msg.attach(MIMEText(body, "html"))
     _send(email, msg)
 
-
+# Connects to the SMTP server and sends the email
 def _send(to: str, msg: MIMEMultipart):
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:

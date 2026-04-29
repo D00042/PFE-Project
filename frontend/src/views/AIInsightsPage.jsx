@@ -19,6 +19,7 @@ const DASHBOARD_TABS = [
   { key: "dso_dpo",       label: "DSO & DPO"     },
 ];
 
+// Renders the expanded detail view for an ai insight
 function ExpandedDetail({ record }) {
   const isRec = record.insightType === "recommendation";
 
@@ -66,6 +67,7 @@ function ExpandedDetail({ record }) {
     );
   }
 
+  //Interpretation: shows risk flags
   const { bullets = [], legal_flags = [] } = record.content;
   return (
     <div>
@@ -83,7 +85,7 @@ function ExpandedDetail({ record }) {
           </li>
         ))}
       </ul>
-    </div>
+    </div> 
   );
 }
 
@@ -95,16 +97,18 @@ export default function AIInsightsPage() {
   const [expandedId,  setExpandedId]  = useState(null);
   const [toast,       setToast]       = useState(null);
   const [dateSearch,  setDateSearch]  = useState("");
-
+ // Reload records and reset state when the tab changes
   useEffect(() => { fetchRecords(); setExpandedId(null); setDateSearch(""); }, [activeTab]);
 
   const fetchRecords = async () => {
     setLoading(true);
     try {
       if (activeTab === "global") {
+        // Global tab only shows global interpretations
         const res = await aiInsightService.getHistory("global", "interpretation");
         setRecords(res.data || []);
       } else {
+        // Other tabs fetch both interpretations and recommendations
         const [interpRes, recRes] = await Promise.all([
           aiInsightService.getHistory(activeTab, "interpretation"),
           aiInsightService.getHistory(activeTab, "recommendation"),
@@ -121,7 +125,7 @@ export default function AIInsightsPage() {
       setLoading(false);
     }
   };
-
+// deletes an insight
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this insight?")) return;
     try {
@@ -147,6 +151,7 @@ export default function AIInsightsPage() {
 
   const showNextPeriod = activeTab !== "global";
 
+  // Filter records by selected date
   const filteredRecords = dateSearch
     ? records.filter(r => {
         const d = new Date(r.createdAt);

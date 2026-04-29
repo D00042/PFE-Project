@@ -7,20 +7,20 @@ const API = "http://localhost:8000"
 function Profile() {
   const navigate = useNavigate()
 
-  // ── Profile info state ────────────────────────────────────────────
+  // Profile info state 
   const [profileForm, setProfileForm] = useState({ fullName: '', email: '', telephone: '' })
   const [profileErrors, setProfileErrors] = useState({})
   const [profileStatus, setProfileStatus] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
-  // ── Password state ────────────────────────────────────────────────
+  // Password state 
   const [oldPassword, setOldPassword]         = useState("")
   const [password, setPassword]               = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passStatus, setPassStatus]           = useState(null)
   const [passLoading, setPassLoading]         = useState(false)
 
-  // ── Load current user info on mount ──────────────────────────────
+  // Load current user info on mount 
   useEffect(() => {
     const stored = localStorage.getItem('user')
     if (!stored) { navigate('/login'); return }
@@ -38,7 +38,7 @@ function Profile() {
     navigate("/login")
   }
 
-  // ── Validators ───────────────────────────────────────────────────
+  // Validators 
   const validateFullName = (v) => {
     if (!v.trim()) return "Full name is required."
     if (v.trim().length < 2) return "Name must be at least 2 characters."
@@ -58,7 +58,7 @@ function Profile() {
     return ""
   }
 
-  // ── Handle profile field change with live validation ─────────────
+  // Handle profile field change with live validation 
   const handleProfileChange = (e) => {
     const { name, value } = e.target
     setProfileForm(p => ({ ...p, [name]: value }))
@@ -69,7 +69,7 @@ function Profile() {
     setProfileErrors(p => ({ ...p, [name]: err }))
   }
 
-  // ── Save profile info ─────────────────────────────────────────────
+  // Save profile info 
   const saveProfile = async () => {
     const nameErr = validateFullName(profileForm.fullName)
     const emailErr = validateEmail(profileForm.email)
@@ -111,7 +111,7 @@ function Profile() {
     }
   }
 
-  // ── Password strength ─────────────────────────────────────────────
+  // Password strength 
   const getStrength = (pwd) => {
     let score = 0
     if (pwd.length >= 8)           score++
@@ -141,7 +141,7 @@ function Profile() {
     { label: "At least one special character", ok: /[^A-Za-z0-9]/.test(password) },
   ]
 
-  // ── Change password ───────────────────────────────────────────────
+  // Change password 
   const changePassword = async () => {
     if (!oldPassword) {
       setPassStatus({ type: "error", message: "Please enter your current password." })
@@ -175,7 +175,7 @@ function Profile() {
   return (
     <div style={styles.page}>
 
-      {/* ── Navbar ── */}
+      {/* Navbar */}
       <nav style={styles.nav}>
         <div style={styles.navLeft}>
           <span style={styles.logo}><span style={styles.logoRed}>✈ TUI</span></span>
@@ -189,7 +189,7 @@ function Profile() {
         </div>
       </nav>
 
-      {/* ── Hero ── */}
+      {/* Hero */}
       <div style={styles.hero}>
         <div style={styles.heroAccent} />
         <h1 style={styles.heroTitle}>My Profile</h1>
@@ -198,7 +198,7 @@ function Profile() {
 
       <div style={styles.content}>
 
-        {/* ── Card 1: Personal Information ── */}
+        {/* Card 1: Personal Information */}
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Personal Information</h2>
           <p style={styles.cardSub}>Update your name, email address, and phone number.</p>
@@ -262,7 +262,7 @@ function Profile() {
           </button>
         </div>
 
-        {/* ── Card 2: Change Password ── */}
+        {/* Card 2: Change Password */}
         <div style={{ ...styles.card, marginTop: 24 }}>
           <h2 style={styles.cardTitle}>Change Password</h2>
           <p style={styles.cardSub}>You will receive a confirmation email once updated.</p>
