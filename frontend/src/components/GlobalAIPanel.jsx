@@ -42,7 +42,7 @@ export default function GlobalAIPanel({ year, period }) {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/ai-insights/generate/global`, {
         method:  "POST",
         headers: {

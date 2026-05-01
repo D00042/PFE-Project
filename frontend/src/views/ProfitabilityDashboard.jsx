@@ -133,7 +133,7 @@ const [aiError, setAiError]               = useState("");
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(
         `${API_URL}/dashboard/profitability?year=${year}&period=${period}`,
         { headers: { Authorization: `Bearer ${token}` } }

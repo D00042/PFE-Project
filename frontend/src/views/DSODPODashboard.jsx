@@ -150,7 +150,7 @@ export default function DSODPODashboard() {
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(
         `${API_URL}/dashboard/dso-dpo?year=${year}&period=${period}`,
         { headers: { Authorization: `Bearer ${token}` } }

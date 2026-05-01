@@ -83,7 +83,7 @@ function Profile() {
     setProfileLoading(true)
     setProfileStatus(null)
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token")
+      const token = localStorage.getItem("token")
       const res = await fetch(`${API}/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

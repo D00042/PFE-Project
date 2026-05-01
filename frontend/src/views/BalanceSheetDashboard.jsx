@@ -325,7 +325,7 @@ export default function BalanceSheetDashboard() {
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/dashboard/balance-sheet?year=${year}&period=${period}`,
         { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) { setError("Failed to load balance sheet data."); return; }

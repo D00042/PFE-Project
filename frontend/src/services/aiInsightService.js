@@ -1,7 +1,6 @@
 const API_BASE_URL = 'http://localhost:8000';
 
-const getToken = () =>
-  localStorage.getItem('token') || localStorage.getItem('access_token');
+const getToken = () => localStorage.getItem('token');
 
 const aiInsightService = {
 

@@ -113,7 +113,7 @@ export default function LiquidityDashboard() {
   const fetchData = async () => {
     setLoading(true); setError("");
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(
         `${API_URL}/dashboard/liquidity?year=${year}&period=${period}&compare_year=${compareYear}`,
         { headers: { Authorization: `Bearer ${token}` } }
