@@ -93,6 +93,7 @@ Limitations
 Authors
 - Douaa Jatlaoui
 - Maryem Gassri
+
 Final Year Project — Business Computing, Business Intelligence
 Higher Institute of Management of Sousse (ISGS), University of Sousse, Tunisia
 Academic year: 2025–2026
