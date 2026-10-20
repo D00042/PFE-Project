@@ -90,6 +90,7 @@ Limitations
 - AI-generated interpretations and recommendations may be incomplete or inaccurate and should be reviewed by a qualified person.
 - A working local setup requires the correct database configuration and, for AI functionality, a valid Cohere API key.
 - This README describes the project based on its academic documentation. Verify the actual repository scripts, environment-variable names, and directory structure before publishing or running it.
+
 Authors
 - Douaa Jatlaoui
 - Maryem Gassri
