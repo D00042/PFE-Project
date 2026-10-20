@@ -95,9 +95,15 @@ Authors
 - Maryem Gassri
 
 Final Year Project — Business Computing, Business Intelligence
+
 Higher Institute of Management of Sousse (ISGS), University of Sousse, Tunisia
+
 Academic year: 2025–2026
+
 Acknowledgements
+
 Academic supervisor: Dr. Nesrine Missaoui
+
 Professional supervisor: Mr. Zied Guiga
+
 If you reuse or adapt this project, please describe your changes and ensure that you have permission to share any third-party or organization-specific materials.
